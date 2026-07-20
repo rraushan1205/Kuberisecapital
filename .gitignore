@@ -1,0 +1,9 @@
+node_modules
+.next
+.next-verify
+.env.local
+backend/.env
+backend/.venv
+backend/storage
+__pycache__
+*.pyc
