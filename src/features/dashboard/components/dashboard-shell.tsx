@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useDashboardSnapshot } from "@/features/dashboard/hooks/use-dashboard-data";
 import { useDashboardUiStore } from "@/features/dashboard/store/dashboard-ui-store";
+import { logout } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -47,8 +48,8 @@ function UserHeader() {
   const subscription = profile?.subscriptionStatus?.trim();
   const broker = profile?.connectedBroker?.trim();
 
-  function signOut() {
-    document.cookie = "stratum_session=; path=/; max-age=0; samesite=lax";
+  async function signOut() {
+    await logout();
     router.replace("/login");
   }
 

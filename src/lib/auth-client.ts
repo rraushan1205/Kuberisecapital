@@ -24,3 +24,11 @@ export async function login(email: string, password: string): Promise<AccountSta
   const data = await response.json() as { account_status: string };
   return data.account_status as AccountStatus;
 }
+
+export async function logout(): Promise<void> {
+  await fetch(`${apiBaseUrl}/api/v1/client/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+    headers: { Accept: "application/json" },
+  });
+}
