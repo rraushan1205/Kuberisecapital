@@ -17,6 +17,15 @@ class Settings(BaseSettings):
     backend_cors_origins: list[str] = []
     strategy_storage_path: Path = Path("./storage/strategies")
     trading_engine_url: str | None = None
+    
+    # Broker API Configuration
+    # Fyers broker credentials (get from https://myapi.fyers.in/dashboard)
+    fyers_app_id: str | None = None
+    fyers_secret_id: str | None = None
+    fyers_redirect_uri: str | None = None
+    
+    # API base URL for constructing callback URLs
+    api_base_url: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

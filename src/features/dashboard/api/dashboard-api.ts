@@ -1,6 +1,23 @@
 import type { DashboardSnapshot, MarketplaceStrategy } from "@/features/dashboard/types";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
+function getApiBaseUrl(): string {
+  if (typeof window === "undefined") {
+    return (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+  }
+
+  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/$/, "");
+  }
+
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return "http://localhost:8000";
+  }
+
+  return window.location.origin;
+}
+
+const apiBaseUrl = getApiBaseUrl();
 
 class DashboardApiError extends Error {
   constructor(message: string, public readonly status?: number) {

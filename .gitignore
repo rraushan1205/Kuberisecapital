@@ -1,9 +1,10 @@
 node_modules
 .next
-.next-verify
+.next-auth-verify
 .env.local
 backend/.env
-backend/.venv
+backend/venv
+venv
 backend/storage
 __pycache__
 *.pyc

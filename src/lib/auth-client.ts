@@ -1,19 +1,26 @@
 export type AccountStatus = "approved" | "pending" | "rejected";
 
-/**
- * Temporary UI contract. Connect these functions to the application auth API;
- * no credentials are persisted in the browser by this interface.
- */
-export async function resolveAccountStatus(email: string): Promise<AccountStatus> {
-  await new Promise((resolve) => window.setTimeout(resolve, 550));
+const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
 
-  // These two addresses make status states easy to exercise during integration.
-  // Replace this adapter with the identity provider response in production.
-  if (email.toLowerCase().startsWith("pending@")) return "pending";
-  if (email.toLowerCase().startsWith("rejected@")) return "rejected";
-  return "approved";
-}
+export async function login(email: string, password: string): Promise<AccountStatus> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/client/auth/login`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
 
-export function establishSession() {
-  document.cookie = "stratum_session=1; path=/; max-age=28800; samesite=lax";
+  if (response.status === 401) {
+    throw new Error("Invalid email or password.");
+  }
+  if (response.status === 403) {
+    const payload = await response.json().catch(() => null) as { detail?: string } | null;
+    throw new Error(payload?.detail || "Access denied.");
+  }
+  if (!response.ok) {
+    throw new Error("Unable to sign in right now.");
+  }
+
+  const data = await response.json() as { account_status: string };
+  return data.account_status as AccountStatus;
 }

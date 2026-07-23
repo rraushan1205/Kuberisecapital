@@ -7,7 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { AuthHeading, FieldBlock, PasswordField, SubmitLabel } from "@/components/auth-primitives";
-import { establishSession, resolveAccountStatus } from "@/lib/auth-client";
+import { login } from "@/lib/auth-client";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
@@ -24,17 +24,20 @@ export function LoginForm() {
   const form = useForm<LoginValues>({ resolver: zodResolver(loginSchema), mode: "onBlur", defaultValues: { email: "", password: "", remember: false } });
 
   async function onSubmit(values: LoginValues) {
-    const status = await resolveAccountStatus(values.email);
-    if (status === "pending") {
-      router.replace(`/pending-approval?email=${encodeURIComponent(values.email)}`);
-      return;
+    try {
+      const status = await login(values.email, values.password);
+      if (status === "pending") {
+        router.replace(`/pending-approval?email=${encodeURIComponent(values.email)}`);
+        return;
+      }
+      if (status === "rejected") {
+        router.replace(`/account-rejected?email=${encodeURIComponent(values.email)}`);
+        return;
+      }
+      router.push(nextPath);
+    } catch (error) {
+      form.setError("password", { message: error instanceof Error ? error.message : "Sign in failed." });
     }
-    if (status === "rejected") {
-      router.replace(`/account-rejected?email=${encodeURIComponent(values.email)}`);
-      return;
-    }
-    establishSession();
-    router.push(nextPath);
   }
 
   const { errors, isSubmitting } = form.formState;
