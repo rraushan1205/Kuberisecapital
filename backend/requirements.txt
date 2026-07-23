@@ -11,3 +11,4 @@ python-multipart==0.0.20
 redis==6.4.0
 SQLAlchemy==2.0.43
 uvicorn[standard]==0.35.0
+cryptography==49.0.0
