@@ -1,4 +1,4 @@
-import type { DashboardSnapshot, MarketplaceStrategy } from "@/features/dashboard/types";
+import type { DashboardSnapshot, MarketplaceStrategy, StrategyFileView } from "@/features/dashboard/types";
 
 function getApiBaseUrl(): string {
   if (typeof window === "undefined") {
@@ -41,6 +41,14 @@ export function getDashboardSnapshot() {
 
 export function getMarketplaceStrategies() {
   return getJson<MarketplaceStrategy[]>("/api/v1/client/marketplace/strategies");
+}
+
+export function getStrategyFileView(strategyId: string) {
+  return getJson<StrategyFileView>(`/api/v1/client/strategies/${strategyId}/view`);
+}
+
+export function getStrategyDownloadUrl(strategyId: string) {
+  return `${apiBaseUrl}/api/v1/client/strategies/${strategyId}/download`;
 }
 
 export function brokerConnectUrl(provider: "fyers" | "groww") {

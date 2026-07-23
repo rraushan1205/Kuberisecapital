@@ -1,4 +1,28 @@
-export type AccountStatus = "approved" | "pending" | "rejected";
+export type AccountStatus = "APPROVED" | "PENDING" | "REJECTED";
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  user: {
+    id: string;
+    email: string;
+    full_name: string | null;
+    role: string;
+    account_status: string;
+    email_verified: boolean;
+  };
+}
+
+export interface RegisterResponse {
+  message: string;
+  email: string;
+}
+
+export interface AccountStatusResponse {
+  email: string;
+  account_status: string;
+  message: string;
+}
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
 

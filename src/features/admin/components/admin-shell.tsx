@@ -37,7 +37,16 @@ function AdminHeader({ onOpenNavigation }: { onOpenNavigation: () => void }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   async function logout() {
     setIsLoggingOut(true);
-    try { await adminApi.logout(); } finally { router.replace("/admin/login"); }
+    try { 
+      await adminApi.logout(); 
+    } catch {
+      // Silently ignore errors if backend is offline
+      // Logout will still work by clearing cookies below
+    } finally { 
+      // Clear admin session cookie
+      document.cookie = "stratum_admin_session=; path=/; max-age=0";
+      router.replace("/admin/login"); 
+    }
   }
   return <header className="flex min-h-[73px] items-center justify-between gap-4 border-b border-[var(--line)] bg-[var(--canvas)] px-4 sm:px-6 lg:px-8"><div className="flex items-center gap-3 lg:hidden"><Button size="icon" variant="quiet" onClick={onOpenNavigation} aria-label="Open admin navigation"><Menu size={19} /></Button><span className="font-mono text-[10px] font-medium tracking-[0.12em] text-[var(--danger)]">SUPER ADMIN</span></div><div className="ml-auto flex items-center gap-2 sm:gap-3"><div className="hidden border-r border-[var(--line)] pr-4 text-right sm:block"><p className="font-mono text-[9px] font-medium uppercase tracking-[0.1em] text-[var(--ink-subtle)]">Authenticated as</p><p className="mt-0.5 max-w-56 truncate text-[12px] font-medium text-[var(--ink)]">{isLoading ? "Loading" : data?.email || "Session unavailable"}</p></div><ThemeToggle /><Button variant="quiet" size="sm" onClick={logout} disabled={isLoggingOut} aria-label="Log out of Admin Portal"><LogOut size={15} /><span className="hidden sm:inline">Log out</span></Button></div></header>;
 }

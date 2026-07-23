@@ -16,45 +16,72 @@ function forbidden() {
   return new NextResponse("Forbidden", { status: 403, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 }
 
-async function hasValidSuperAdminSession(token: string | undefined) {
+async function verifyJwtToken(token: string | undefined) {
   const secret = process.env.JWT_SECRET_KEY;
-  if (!token || !secret) return false;
+  if (!token || !secret) return null;
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), { algorithms: ["HS256"] });
-    return payload.role === "SUPER_ADMIN";
+    return payload;
   } catch {
-    return false;
+    return null;
   }
+}
+
+async function hasValidSuperAdminSession(token: string | undefined) {
+  const payload = await verifyJwtToken(token);
+  return payload?.role === "SUPER_ADMIN";
+}
+
+async function hasValidUserSession(token: string | undefined) {
+  const payload = await verifyJwtToken(token);
+  return payload !== null;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = request.cookies.has("stratum_session");
-  const adminSession = request.cookies.get("stratum_admin_session")?.value;
-  const hasValidAdminSession = await hasValidSuperAdminSession(adminSession);
+  
+  // Get tokens from cookies
+  const userToken = request.cookies.get("stratum_token")?.value;
+  const adminToken = request.cookies.get("stratum_admin_session")?.value;
+  
+  // Validate tokens
+  const hasValidUserToken = await hasValidUserSession(userToken);
+  const hasValidAdminToken = await hasValidSuperAdminSession(adminToken);
+  
   const isAuthRoute = authRoutes.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
 
+  // Admin routes protection
   if (pathname.startsWith("/admin")) {
     if (pathname === "/admin/login") {
-      if (hasSession && !hasValidAdminSession) return forbidden();
-      if (hasValidAdminSession) return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+      // If user has valid user token but not admin, forbid access
+      if (hasValidUserToken && !hasValidAdminToken) return forbidden();
+      // If already logged in as admin, redirect to dashboard
+      if (hasValidAdminToken) return NextResponse.redirect(new URL("/admin/dashboard", request.url));
       return NextResponse.next();
     }
 
-    if (hasValidAdminSession) return NextResponse.next();
-    if (hasSession || adminSession) return forbidden();
+    // All other admin routes require valid admin token
+    if (hasValidAdminToken) return NextResponse.next();
+    // If has user token or invalid admin token, forbid
+    if (hasValidUserToken || adminToken) return forbidden();
+    // Otherwise redirect to admin login
     return NextResponse.redirect(new URL("/admin/login", request.url));
   }
 
-  if (pathname.startsWith("/dashboard") && !hasSession) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+  // User dashboard routes protection - require valid JWT token
+  if (pathname.startsWith("/dashboard")) {
+    if (!hasValidUserToken) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next();
   }
 
-  if (isAuthRoute && hasSession && pathname === "/login") {
+  // Redirect logged-in users away from login page
+  if (isAuthRoute && hasValidUserToken && pathname === "/login") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

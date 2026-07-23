@@ -101,6 +101,13 @@ button, input { font: inherit; }
 
 .animate-soft-pulse { animation: soft-pulse 2.8s ease-in-out infinite; }
 
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-ticker { animation: ticker 30s linear infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

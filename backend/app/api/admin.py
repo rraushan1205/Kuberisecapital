@@ -81,6 +81,44 @@ def list_pending_registrations(_: SuperAdmin, db: DbSession) -> list[User]:
     return list(db.scalars(statement))
 
 
+@router.post("/users/{user_id}/approve", response_model=UserOutput)
+def approve_user_account(user_id: UUID, _: SuperAdmin, db: DbSession) -> User:
+    """
+    Approve a pending user registration.
+    Sets account_status to APPROVED and allows the user to login.
+    """
+    user = db.get(User, user_id)
+    if user is None or user.role != UserRole.USER:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account was not found.")
+    
+    if user.account_status == AccountStatus.APPROVED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User account is already approved.")
+    
+    user.account_status = AccountStatus.APPROVED
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/users/{user_id}/reject", response_model=UserOutput)
+def reject_user_account(user_id: UUID, _: SuperAdmin, db: DbSession) -> User:
+    """
+    Reject a pending user registration.
+    Sets account_status to REJECTED and prevents the user from logging in.
+    """
+    user = db.get(User, user_id)
+    if user is None or user.role != UserRole.USER:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account was not found.")
+    
+    if user.account_status == AccountStatus.REJECTED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User account is already rejected.")
+    
+    user.account_status = AccountStatus.REJECTED
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 @router.post("/subscriptions/{user_id}/approve", response_model=UserOutput)
 def approve_subscription(user_id: UUID, _: SuperAdmin, db: DbSession) -> User:
     user = db.get(User, user_id)
