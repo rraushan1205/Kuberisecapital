@@ -34,11 +34,11 @@ export function LoginForm() {
     
     try {
       const status = await login(values.email, values.password);
-      if (status === "pending") {
+      if (status === "PENDING") {
         router.replace(`/pending-approval?email=${encodeURIComponent(values.email)}`);
         return;
       }
-      if (status === "rejected") {
+      if (status === "REJECTED") {
         router.replace(`/account-rejected?email=${encodeURIComponent(values.email)}`);
         return;
       }

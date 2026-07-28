@@ -1,4 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -8,7 +9,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: "bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)]",
+        default: "bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)]",
         secondary: "border border-[var(--line-strong)] bg-[var(--panel)] text-[var(--ink)] hover:border-[var(--ink-subtle)] hover:bg-[var(--panel-raised)]",
+        outline: "border border-[var(--line-strong)] bg-transparent text-[var(--ink)] hover:bg-[var(--panel-raised)]",
         quiet: "text-[var(--ink-muted)] hover:bg-[var(--panel-raised)] hover:text-[var(--ink)]",
         danger: "border border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)] hover:brightness-95",
       },
@@ -23,13 +26,27 @@ const buttonVariants = cva(
   },
 );
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {}
+export interface ButtonProps
+  extends ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { className, variant, size, type = "button", ...props },
-  ref,
+function ButtonImpl(
+  { className, variant, size, type = "button", asChild = false, ...props }: ButtonProps,
+  ref: React.ForwardedRef<HTMLButtonElement>,
 ) {
-  return <button ref={ref} type={type} className={cn(buttonVariants({ variant, size }), className)} {...props} />;
-});
+  const Comp = asChild ? Slot : "button";
+  return (
+    <Comp
+      ref={ref}
+      {...(asChild ? {} : { type })}
+      className={cn(buttonVariants({ variant, size }), className)}
+      {...props}
+    />
+  );
+}
+
+export const Button = forwardRef(ButtonImpl);
 
 Button.displayName = "Button";
