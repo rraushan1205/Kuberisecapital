@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Bell, ClipboardList, FileCode2, LayoutDashboard, LogOut, Menu, RadioTower, ShieldCheck, Users, UserRoundCheck, UserRoundPlus, X } from "lucide-react";
+import { Bell, ClipboardList, CreditCard, FileCode2, LayoutDashboard, LogOut, Menu, RadioTower, ShieldCheck, Users, UserRoundCheck, UserRoundPlus, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -16,6 +16,7 @@ const navigation = [
   { href: "/admin/users", label: "User management", icon: Users },
   { href: "/admin/pending-registrations", label: "Pending registrations", icon: UserRoundPlus },
   { href: "/admin/subscriptions", label: "Subscription approval", icon: UserRoundCheck },
+  { href: "/admin/subscription-requests", label: "Subscription requests", icon: CreditCard },
   { href: "/admin/connected-users", label: "Connected users", icon: RadioTower },
   { href: "/admin/strategies", label: "Strategies", icon: FileCode2 },
   { href: "/admin/logs", label: "Execution logs", icon: ClipboardList },

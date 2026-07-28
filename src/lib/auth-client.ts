@@ -49,6 +49,37 @@ export async function login(email: string, password: string): Promise<AccountSta
   return data.account_status as AccountStatus;
 }
 
+export async function registerUser(
+  email: string,
+  password: string,
+  fullName: string,
+  phoneNumber?: string,
+  invitationCode?: string
+): Promise<RegisterResponse> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/auth/register`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      email,
+      password,
+      full_name: fullName,
+      phone_number: phoneNumber,
+      invitation_code: invitationCode,
+    }),
+  });
+
+  if (response.status === 409) {
+    throw new Error("An account with this email already exists.");
+  }
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null) as { detail?: string } | null;
+    throw new Error(errorData?.detail || "Registration failed. Please try again.");
+  }
+
+  return await response.json() as RegisterResponse;
+}
+
 export async function logout(): Promise<void> {
   await fetch(`${apiBaseUrl}/api/v1/client/auth/logout`, {
     method: "POST",

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -8,7 +9,12 @@ from sqlalchemy import select
 
 from app.api.dependencies import CurrentUser, DbSession
 from app.core.config import get_settings
-from app.models.domain import Strategy
+from app.models.domain import Strategy, SubscriptionPlan, SubscriptionRequest, SubscriptionRequestStatus, SubscriptionStatus
+from app.schemas.subscription import (
+    SubscriptionPlanOutput,
+    SubscriptionRequestInput,
+    SubscriptionRequestOutput,
+)
 
 router = APIRouter(prefix="/api/v1/client", tags=["client"])
 
@@ -121,3 +127,76 @@ def view_strategy_file(strategy_id: UUID, _: CurrentUser, db: DbSession) -> dict
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not read strategy file."
         )
+
+
+@router.get("/subscription/plans", response_model=list[SubscriptionPlanOutput])
+def get_subscription_plans(_: CurrentUser, db: DbSession) -> list[SubscriptionPlan]:
+    """
+    Get all available subscription plans.
+    Returns all active subscription plans with their details.
+    """
+    plans = db.scalars(
+        select(SubscriptionPlan)
+        .where(SubscriptionPlan.is_active == True)
+        .order_by(SubscriptionPlan.capital.asc())
+    ).all()
+    return list(plans)
+
+
+@router.get("/subscription/my-requests", response_model=list[SubscriptionRequestOutput])
+def get_my_subscription_requests(user: CurrentUser, db: DbSession) -> list[SubscriptionRequest]:
+    """
+    Get all subscription requests made by the current user.
+    Returns the user's subscription request history ordered by most recent first.
+    """
+    requests = db.scalars(
+        select(SubscriptionRequest)
+        .where(SubscriptionRequest.user_id == user.id)
+        .order_by(SubscriptionRequest.requested_at.desc())
+    ).all()
+    return list(requests)
+
+
+@router.post("/subscription/request", response_model=SubscriptionRequestOutput, status_code=status.HTTP_201_CREATED)
+def request_subscription_plan(payload: SubscriptionRequestInput, user: CurrentUser, db: DbSession) -> SubscriptionRequest:
+    """
+    Request a subscription plan.
+    Users can request any plan at any time. Current plan remains active until admin approves.
+    """
+    # Check if plan exists and is active
+    plan = db.get(SubscriptionPlan, payload.plan_id)
+    if plan is None or not plan.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription plan not found or inactive.")
+    
+    # Check if user already has a pending request for this plan
+    existing_pending = db.scalar(
+        select(SubscriptionRequest)
+        .where(
+            SubscriptionRequest.user_id == user.id,
+            SubscriptionRequest.plan_id == payload.plan_id,
+            SubscriptionRequest.status == SubscriptionRequestStatus.PENDING
+        )
+    )
+    if existing_pending:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already have a pending request for this plan."
+        )
+    
+    # Check if this is already the user's current plan
+    if user.current_plan_id == payload.plan_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This is already your current active plan."
+        )
+    
+    # Create the subscription request
+    request = SubscriptionRequest(
+        user_id=user.id,
+        plan_id=payload.plan_id,
+        status=SubscriptionRequestStatus.PENDING
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return request

@@ -41,6 +41,20 @@ class ExecutionAction(str, enum.Enum):
     FORCE_SQUARE_OFF = "FORCE_SQUARE_OFF"
 
 
+class SubscriptionPlanTier(str, enum.Enum):
+    BASIC = "BASIC"
+    PLUS = "PLUS"
+    PRO = "PRO"
+    ELITE = "ELITE"
+    MAX = "MAX"
+
+
+class SubscriptionRequestStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -52,10 +66,13 @@ class User(Base):
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     account_status: Mapped[AccountStatus] = mapped_column(Enum(AccountStatus, name="account_status"), default=AccountStatus.PENDING)
     subscription_status: Mapped[SubscriptionStatus] = mapped_column(Enum(SubscriptionStatus, name="subscription_status"), default=SubscriptionStatus.INACTIVE)
+    current_plan_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("subscription_plans.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     broker_connections: Mapped[list["BrokerConnection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    current_plan: Mapped["SubscriptionPlan | None"] = relationship(foreign_keys=[current_plan_id])
+    subscription_requests: Mapped[list["SubscriptionRequest"]] = relationship(back_populates="user", foreign_keys="[SubscriptionRequest.user_id]", cascade="all, delete-orphan")
 
 
 class BrokerConnection(Base):
@@ -107,3 +124,33 @@ class Announcement(Base):
     message: Mapped[str] = mapped_column(Text)
     created_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class SubscriptionPlan(Base):
+    __tablename__ = "subscription_plans"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    tier: Mapped[SubscriptionPlanTier] = mapped_column(Enum(SubscriptionPlanTier, name="subscription_plan_tier"), unique=True, index=True)
+    capital: Mapped[int] = mapped_column()
+    nifty_lots: Mapped[int] = mapped_column()
+    sensex_lots: Mapped[int] = mapped_column()
+    bank_nifty_lots: Mapped[int] = mapped_column()
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SubscriptionRequest(Base):
+    __tablename__ = "subscription_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    plan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("subscription_plans.id", ondelete="RESTRICT"))
+    status: Mapped[SubscriptionRequestStatus] = mapped_column(Enum(SubscriptionRequestStatus, name="subscription_request_status"), default=SubscriptionRequestStatus.PENDING, index=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    user: Mapped[User] = relationship(back_populates="subscription_requests", foreign_keys=[user_id])
+    plan: Mapped[SubscriptionPlan] = relationship()
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id])

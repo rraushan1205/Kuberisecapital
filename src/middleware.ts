@@ -41,7 +41,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Get tokens from cookies
-  const userToken = request.cookies.get("stratum_token")?.value;
+  const userToken = request.cookies.get("stratum_session")?.value;
   const adminToken = request.cookies.get("stratum_admin_session")?.value;
   
   // Validate tokens
