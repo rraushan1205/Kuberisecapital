@@ -17,6 +17,9 @@ from app.models.domain import (
     ExecutionLog,
     Strategy,
     StrategyStatus,
+    SubscriptionPlan,
+    SubscriptionRequest,
+    SubscriptionRequestStatus,
     SubscriptionStatus,
     User,
     UserRole,
@@ -30,6 +33,11 @@ from app.schemas.admin import (
     ExecutionLogOutput,
     StrategyOutput,
     UserOutput,
+)
+from app.schemas.subscription import (
+    ApproveSubscriptionRequestInput,
+    RejectSubscriptionRequestInput,
+    SubscriptionRequestWithDetailsOutput,
 )
 from app.services.trading_engine import dispatch_engine_command
 
@@ -79,6 +87,44 @@ def list_users(_: SuperAdmin, db: DbSession) -> list[User]:
 def list_pending_registrations(_: SuperAdmin, db: DbSession) -> list[User]:
     statement = select(User).where(User.account_status == AccountStatus.PENDING).order_by(User.created_at.asc())
     return list(db.scalars(statement))
+
+
+@router.post("/users/{user_id}/approve", response_model=UserOutput)
+def approve_user_account(user_id: UUID, _: SuperAdmin, db: DbSession) -> User:
+    """
+    Approve a pending user registration.
+    Sets account_status to APPROVED and allows the user to login.
+    """
+    user = db.get(User, user_id)
+    if user is None or user.role != UserRole.USER:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account was not found.")
+    
+    if user.account_status == AccountStatus.APPROVED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User account is already approved.")
+    
+    user.account_status = AccountStatus.APPROVED
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/users/{user_id}/reject", response_model=UserOutput)
+def reject_user_account(user_id: UUID, _: SuperAdmin, db: DbSession) -> User:
+    """
+    Reject a pending user registration.
+    Sets account_status to REJECTED and prevents the user from logging in.
+    """
+    user = db.get(User, user_id)
+    if user is None or user.role != UserRole.USER:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account was not found.")
+    
+    if user.account_status == AccountStatus.REJECTED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User account is already rejected.")
+    
+    user.account_status = AccountStatus.REJECTED
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.post("/subscriptions/{user_id}/approve", response_model=UserOutput)
@@ -209,3 +255,165 @@ def create_announcement(payload: AnnouncementInput, admin: SuperAdmin, db: DbSes
     db.commit()
     db.refresh(announcement)
     return announcement
+
+
+@router.get("/subscription-requests", response_model=list[SubscriptionRequestWithDetailsOutput])
+def list_subscription_requests(_: SuperAdmin, db: DbSession) -> list[SubscriptionRequestWithDetailsOutput]:
+    """
+    Get all subscription requests with user and plan details.
+    Returns pending requests first, then recent approved/rejected.
+    """
+    statement = (
+        select(SubscriptionRequest, User, SubscriptionPlan)
+        .join(User, SubscriptionRequest.user_id == User.id)
+        .join(SubscriptionPlan, SubscriptionRequest.plan_id == SubscriptionPlan.id)
+        .order_by(
+            # Pending first
+            (SubscriptionRequest.status == SubscriptionRequestStatus.PENDING).desc(),
+            # Then by most recent
+            SubscriptionRequest.requested_at.desc()
+        )
+    )
+    
+    results = []
+    for request, user, plan in db.execute(statement).all():
+        # Get current plan info
+        current_plan = None
+        if user.current_plan_id:
+            current_plan = db.get(SubscriptionPlan, user.current_plan_id)
+        
+        results.append(
+            SubscriptionRequestWithDetailsOutput(
+                id=request.id,
+                user_id=user.id,
+                user_email=user.email,
+                user_full_name=user.full_name,
+                plan_tier=plan.tier,
+                plan_capital=plan.capital,
+                current_plan_tier=current_plan.tier if current_plan else None,
+                status=request.status,
+                requested_at=request.requested_at,
+                reviewed_at=request.reviewed_at,
+                reviewed_by_id=request.reviewed_by_id,
+                notes=request.notes,
+            )
+        )
+    
+    return results
+
+
+@router.post("/subscription-requests/{request_id}/approve")
+def approve_subscription_request(
+    request_id: UUID,
+    payload: ApproveSubscriptionRequestInput,
+    admin: SuperAdmin,
+    db: DbSession
+) -> SubscriptionRequestWithDetailsOutput:
+    """
+    Approve a subscription request.
+    Updates user's current plan and activates their subscription.
+    """
+    request = db.get(SubscriptionRequest, request_id)
+    if request is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription request not found.")
+    
+    if request.status != SubscriptionRequestStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Request is already {request.status.value.lower()}."
+        )
+    
+    # Get user and plan
+    user = db.get(User, request.user_id)
+    plan = db.get(SubscriptionPlan, request.plan_id)
+    
+    if user is None or plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User or plan not found.")
+    
+    # Update the request
+    request.status = SubscriptionRequestStatus.APPROVED
+    request.reviewed_at = datetime.now(UTC)
+    request.reviewed_by_id = admin.id
+    request.notes = payload.notes
+    
+    # Update user's subscription
+    user.current_plan_id = plan.id
+    user.subscription_status = SubscriptionStatus.ACTIVE
+    
+    db.commit()
+    db.refresh(request)
+    
+    # Return detailed output
+    current_plan = db.get(SubscriptionPlan, user.current_plan_id)
+    return SubscriptionRequestWithDetailsOutput(
+        id=request.id,
+        user_id=user.id,
+        user_email=user.email,
+        user_full_name=user.full_name,
+        plan_tier=plan.tier,
+        plan_capital=plan.capital,
+        current_plan_tier=current_plan.tier if current_plan else None,
+        status=request.status,
+        requested_at=request.requested_at,
+        reviewed_at=request.reviewed_at,
+        reviewed_by_id=request.reviewed_by_id,
+        notes=request.notes,
+    )
+
+
+@router.post("/subscription-requests/{request_id}/reject")
+def reject_subscription_request(
+    request_id: UUID,
+    payload: RejectSubscriptionRequestInput,
+    admin: SuperAdmin,
+    db: DbSession
+) -> SubscriptionRequestWithDetailsOutput:
+    """
+    Reject a subscription request.
+    User's current plan remains unchanged.
+    """
+    request = db.get(SubscriptionRequest, request_id)
+    if request is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription request not found.")
+    
+    if request.status != SubscriptionRequestStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Request is already {request.status.value.lower()}."
+        )
+    
+    # Get user and plan
+    user = db.get(User, request.user_id)
+    plan = db.get(SubscriptionPlan, request.plan_id)
+    
+    if user is None or plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User or plan not found.")
+    
+    # Update the request
+    request.status = SubscriptionRequestStatus.REJECTED
+    request.reviewed_at = datetime.now(UTC)
+    request.reviewed_by_id = admin.id
+    request.notes = payload.notes
+    
+    db.commit()
+    db.refresh(request)
+    
+    # Return detailed output
+    current_plan = None
+    if user.current_plan_id:
+        current_plan = db.get(SubscriptionPlan, user.current_plan_id)
+    
+    return SubscriptionRequestWithDetailsOutput(
+        id=request.id,
+        user_id=user.id,
+        user_email=user.email,
+        user_full_name=user.full_name,
+        plan_tier=plan.tier,
+        plan_capital=plan.capital,
+        current_plan_tier=current_plan.tier if current_plan else None,
+        status=request.status,
+        requested_at=request.requested_at,
+        reviewed_at=request.reviewed_at,
+        reviewed_by_id=request.reviewed_by_id,
+        notes=request.notes,
+    )

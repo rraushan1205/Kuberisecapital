@@ -8,6 +8,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, BadgeCheck, Check, CircleAlert, LoaderCircle } from "lucide-react";
 import { AuthHeading, FieldBlock, PasswordField, SubmitLabel } from "@/components/auth-primitives";
+import { registerUser } from "@/lib/auth-client";
 
 const registerSchema = z.object({
   fullName: z.string().trim().min(2, "Enter your full name.").max(80, "Use 80 characters or fewer."),
@@ -51,6 +52,7 @@ export function RegisterForm() {
   }
 
   async function onSubmit(values: RegisterValues) {
+    // Validate invitation code first
     let isValid = inviteState === "valid";
     if (!isValid) {
       setInviteState("checking");
@@ -61,8 +63,22 @@ export function RegisterForm() {
       form.setError("invitationCode", { message: "This invitation code is not active." });
       return;
     }
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
-    router.push(`/verify-email/success?email=${encodeURIComponent(values.email)}`);
+
+    try {
+      // Register user with backend
+      await registerUser(values.email, values.password, values.fullName);
+      
+      // Redirect to pending approval page
+      router.push(`/pending-approval?email=${encodeURIComponent(values.email)}`);
+    } catch (error: any) {
+      const errorMessage = error.message || "Registration failed";
+      
+      if (errorMessage.includes("already exists")) {
+        form.setError("email", { message: "An account with this email already exists." });
+      } else {
+        form.setError("root", { message: errorMessage });
+      }
+    }
   }
 
   return (
@@ -70,6 +86,11 @@ export function RegisterForm() {
       <AuthHeading eyebrow="MEMBER ENROLLMENT" title="Request access.">
         An active invitation is required. Your request will be reviewed after email verification.
       </AuthHeading>
+      {errors.root && (
+        <div className="rounded-lg border border-[var(--danger)] bg-[var(--danger)]/5 px-4 py-3 text-sm text-[var(--danger)]">
+          {errors.root.message}
+        </div>
+      )}
       <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-[18px]">
         <FieldBlock label="Full name" htmlFor="fullName" error={errors.fullName?.message}>
           <input id="fullName" autoComplete="name" placeholder="Your full name" className="auth-input" aria-invalid={!!errors.fullName} {...form.register("fullName")} />

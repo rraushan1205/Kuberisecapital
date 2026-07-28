@@ -11,3 +11,23 @@ export function AdminEmpty({ message }: { message: string }) {
 export function AdminError({ message }: { message: string }) {
   return <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-[var(--danger)] bg-[var(--danger-soft)] px-3.5 py-3 text-[12px] leading-5 text-[var(--danger)]"><AlertCircle size={16} className="mt-0.5 shrink-0" />{message}</div>;
 }
+
+type AdminDataStateProps = {
+  state: "loading" | "empty" | "error";
+  emptyMessage?: string;
+  errorMessage?: string;
+  rows?: number;
+};
+
+export function AdminDataState({ state, emptyMessage = "No data available", errorMessage = "Failed to load data", rows = 4 }: AdminDataStateProps) {
+  if (state === "loading") {
+    return <AdminLoadingRows rows={rows} />;
+  }
+  if (state === "empty") {
+    return <AdminEmpty message={emptyMessage} />;
+  }
+  if (state === "error") {
+    return <AdminError message={errorMessage} />;
+  }
+  return null;
+}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,9 +22,16 @@ export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const nextPath = params.get("next") || "/dashboard";
-  const form = useForm<LoginValues>({ resolver: zodResolver(loginSchema), mode: "onBlur", defaultValues: { email: "", password: "", remember: false } });
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const form = useForm<LoginValues>({ 
+    resolver: zodResolver(loginSchema), 
+    mode: "onBlur", 
+    defaultValues: { email: "", password: "", remember: false } 
+  });
 
   async function onSubmit(values: LoginValues) {
+    setLoginError(null);
+    
     try {
       const status = await login(values.email, values.password);
       if (status === "pending") {
@@ -36,7 +44,9 @@ export function LoginForm() {
       }
       router.push(nextPath);
     } catch (error) {
-      form.setError("password", { message: error instanceof Error ? error.message : "Sign in failed." });
+      const errorMessage = error instanceof Error ? error.message : "Sign in failed.";
+      setLoginError(errorMessage);
+      form.setError("password", { message: errorMessage });
     }
   }
 
@@ -46,6 +56,11 @@ export function LoginForm() {
       <AuthHeading eyebrow="MEMBER SIGN IN" title="Welcome back.">
         Sign in to continue to your execution workspace.
       </AuthHeading>
+      {loginError && (
+        <div className="rounded-lg border border-[var(--danger)] bg-[var(--danger)]/5 px-4 py-3 text-sm text-[var(--danger)]">
+          {loginError}
+        </div>
+      )}
       <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-5">
         <FieldBlock label="Email address" htmlFor="email" error={errors.email?.message}>
           <input id="email" autoComplete="email" inputMode="email" placeholder="you@firm.com" className="auth-input" aria-invalid={!!errors.email} {...form.register("email")} />

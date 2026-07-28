@@ -38,3 +38,10 @@ export type MarketplaceStrategy = {
   status?: string | null;
   scriptFileName?: string | null;
 };
+
+export type StrategyFileView = {
+  filename: string;
+  content: string;
+  readonly: boolean;
+  message: string;
+};

@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { BarChart3, Building2, ChevronDown, CircleHelp, LayoutDashboard, LogOut, Menu, Settings2, Store } from "lucide-react";
+import { BarChart3, Building2, ChevronDown, CircleHelp, CreditCard, LayoutDashboard, LogOut, Menu, Settings2, Store } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { useDashboardSnapshot } from "@/features/dashboard/hooks/use-dashboard-data";
 import { useDashboardUiStore } from "@/features/dashboard/store/dashboard-ui-store";
+import { MarketTicker } from "@/features/dashboard/components/market-ticker";
 import { logout } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/marketplace", label: "Marketplace", icon: Store, note: "Strategies" },
   { href: "/dashboard/broker", label: "Broker", icon: Building2 },
+  { href: "/dashboard/subscription", label: "Subscription", icon: CreditCard, note: "Plans" },
   { href: "/dashboard/support", label: "Support", icon: CircleHelp },
   { href: "/dashboard/settings", label: "Settings", icon: Settings2 },
 ];
@@ -120,6 +122,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       </AnimatePresence>
       <div className="min-w-0 lg:col-start-2">
         <UserHeader />
+        <MarketTicker />
         <main className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
       </div>
     </div>

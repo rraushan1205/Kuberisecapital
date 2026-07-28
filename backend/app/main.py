@@ -4,8 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.admin import router as admin_router
+from app.api.auth import router as auth_router
 from app.api.client_auth import router as client_auth_router
 from app.api.client_brokers import router as client_brokers_router
+from app.api.client import router as client_router
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.services.admin_bootstrap import ensure_initial_super_admin
@@ -36,8 +38,10 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 app.include_router(admin_router)
+app.include_router(auth_router)
 app.include_router(client_auth_router)
 app.include_router(client_brokers_router)
+app.include_router(client_router)
 
 
 @app.get("/health")
