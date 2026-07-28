@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowRight, Building2, CircleAlert, FileCode2, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, Building2, FileCode2, ShieldCheck, Store } from "lucide-react";
 import Link from "next/link";
-import { DataError, DataUnavailable } from "@/components/ui/data-state";
+import { DataError } from "@/components/ui/data-state";
 import { SectionCard, SectionCardHeader } from "@/components/ui/section-card";
+import { TradingCalendar } from "@/components/trading-calendar/TradingCalendar";
 import { useDashboardSnapshot } from "@/features/dashboard/hooks/use-dashboard-data";
 
 function SnapshotValue({ label, value, detail }: { label: string; value?: string | number | null; detail?: string }) {
@@ -53,55 +54,36 @@ export function DashboardOverview() {
 
       {isError && <DataError message="Dashboard data is unavailable. Existing values will appear when the account service reconnects." />}
 
-      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-        <SectionCard>
-          <SectionCardHeader eyebrow="STRATEGY" title="Strategy status" action={<Link href="/dashboard/marketplace" className="inline-flex items-center gap-1.5 rounded-md text-[12px] font-medium text-[var(--accent)] outline-none transition hover:text-[var(--accent-strong)] focus-visible:ring-2 focus-visible:ring-[var(--focus)]">Marketplace <ArrowRight size={14} /></Link>} />
-          <div className="grid divide-y divide-[var(--line)] sm:grid-cols-[1.2fr_0.8fr] sm:divide-x sm:divide-y-0">
-            <div className="px-5 py-5">
-              <p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Selected strategy</p>
-              <p className="text-[19px] font-semibold tracking-[-0.035em] text-[var(--ink)]">{strategy?.selectedName || "No strategy selected"}</p>
-              <p className="mt-2 text-[12px] leading-5 text-[var(--ink-muted)]">{strategy?.status ? `Status: ${strategy.status}` : "An administrator publishes available strategy access."}</p>
-            </div>
-            <div className="px-5 py-5">
-              <div className="mb-2 flex items-center gap-2 text-[var(--ink-subtle)]"><FileCode2 size={15} /><span className="font-mono text-[10px] font-medium uppercase tracking-[0.11em]">Python script</span></div>
-              <p className="truncate text-[13px] font-medium text-[var(--ink)]">{strategy?.scriptFileName || "Not assigned"}</p>
-              <p className="mt-2 text-[11px] leading-4 text-[var(--ink-muted)]">Strategy files are admin-managed and not editable from this portal.</p>
-            </div>
-          </div>
-        </SectionCard>
+      <div className="grid gap-4 lg:grid-cols-3">
+  <SectionCard className="overflow-hidden lg:col-span-2">
+    <SectionCardHeader
+      eyebrow="JOURNAL"
+      title="Trading P&L Calendar"
+    />
+    <div className="p-5">
+      <TradingCalendar />
+    </div>
+  </SectionCard>
 
-        <SectionCard>
-          <SectionCardHeader eyebrow="PERFORMANCE" title="Profit & Loss" />
-          <div className="grid divide-x divide-[var(--line)] sm:grid-cols-2">
-            <SnapshotValue label="Daily P&L" value={pnl?.daily} />
-            <SnapshotValue label="Overall P&L" value={pnl?.overall} />
-          </div>
-        </SectionCard>
-      </div>
+  <SectionCard>
+    <SectionCardHeader
+      eyebrow="PERFORMANCE"
+      title="Profit & Loss"
+    />
 
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <SectionCard>
-          <SectionCardHeader eyebrow="POSITIONS" title="Position status" />
-          <div className="grid divide-x divide-[var(--line)] sm:grid-cols-2">
-            <SnapshotValue label="Open positions" value={positions?.open} detail={positions?.open === null || positions?.open === undefined ? "Position data not available" : "Current open positions"} />
-            <SnapshotValue label="Closed positions" value={positions?.closed} detail={positions?.closed === null || positions?.closed === undefined ? "Position data not available" : "Recorded closed positions"} />
-          </div>
-        </SectionCard>
+    <div className="grid divide-y divide-[var(--line)]">
+      <SnapshotValue
+        label="Daily P&L"
+        value={pnl?.daily}
+      />
 
-        <SectionCard>
-          <SectionCardHeader eyebrow="ACCOUNT CONFIGURATION" title="Subscription, broker & risk" />
-          <div className="grid divide-y divide-[var(--line)] sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-            <div className="divide-y divide-[var(--line)]">
-              <CompactDatum label="Subscription status" value={subscription?.status} />
-              <CompactDatum label="Broker connection" value={broker?.status || broker?.provider} />
-            </div>
-            <div className="divide-y divide-[var(--line)]">
-              <CompactDatum label="Lot size" value={preferences?.lotSize} />
-              <CompactDatum label="Risk settings" value={preferences?.riskSettings} />
-            </div>
-          </div>
-        </SectionCard>
-      </div>
+      <SnapshotValue
+        label="Overall P&L"
+        value={pnl?.overall}
+      />
+    </div>
+  </SectionCard>
+</div>
 
       <SectionCard className="overflow-hidden">
         <SectionCardHeader eyebrow="NEXT STEPS" title="Account setup guidance" />

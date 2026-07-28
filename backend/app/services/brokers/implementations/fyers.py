@@ -139,6 +139,11 @@ class FyersBroker(BrokerProvider):
             # Generate auth URL (Fyers SDK includes the state we passed in above)
             auth_url = fyers.generate_authcode()
 
+            # Record that this state was legitimately issued by this server, so the
+            # callback can verify it later instead of just checking its format.
+            from app.services.oauth_state_store import store_oauth_state
+            await store_oauth_state(state)
+
             return auth_url
 
         except Exception as error:
