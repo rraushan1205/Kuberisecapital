@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { SubscriptionsPage } from "@/features/admin/components/subscriptions-page";
+import { SubscriptionPlansPage } from "@/features/admin/components/subscription-plans-page";
 
-export const metadata: Metadata = { title: "Subscription approval" };
+export const metadata: Metadata = { title: "Subscription plans" };
 
 export default function SubscriptionsRoute() {
-  return <SubscriptionsPage />;
+  return <SubscriptionPlansPage />;
 }

@@ -3,6 +3,7 @@
 import { ArrowRight, TrendingUp, TrendingDown, CircleAlert, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { SectionCard, SectionCardHeader } from "@/components/ui/section-card";
+import { TradingCalendar } from "@/components/trading-calendar/TradingCalendar";
 import { useDashboardSnapshot, usePositions, useExecutionLogs, usePnlChartData } from "@/features/dashboard/hooks/use-dashboard-data";
 import type { Position, ExecutionLog } from "@/features/dashboard/lib/mock-data";
 
@@ -119,7 +120,6 @@ export function DashboardOverviewEnhanced() {
   const pnl = snapshot?.pnl;
   const positionStats = snapshot?.positions;
   const subscription = snapshot?.subscription;
-  const broker = snapshot?.broker;
   const preferences = snapshot?.preferences;
 
   return (
@@ -129,7 +129,7 @@ export function DashboardOverviewEnhanced() {
           <p className="mb-2 font-mono text-[10px] font-medium tracking-[0.13em] text-[var(--accent)]">CLIENT WORKSPACE</p>
           <h1 className="text-[27px] font-semibold tracking-[-0.05em] text-[var(--ink)] sm:text-[31px]">Account overview</h1>
         </div>
-        <p className="max-w-sm text-[12px] leading-5 text-[var(--ink-muted)]">Your account, strategy, and broker information in one controlled view.</p>
+        <p className="max-w-sm text-[12px] leading-5 text-[var(--ink-muted)]">Your account and strategy information in one controlled view.</p>
       </div>
 
       {/* Demo Mode Banner */}
@@ -144,6 +144,43 @@ export function DashboardOverviewEnhanced() {
         <span className="rounded-md border border-yellow-500/40 bg-yellow-500/20 px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-yellow-600 dark:text-yellow-400">
           GO LIVE
         </span>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <SectionCard className="overflow-hidden lg:col-span-2">
+          <SectionCardHeader
+            eyebrow="JOURNAL"
+            title="Trading P&L Calendar"
+          />
+          <div className="p-5">
+            <TradingCalendar />
+          </div>
+        </SectionCard>
+
+        {/* Profit & Loss */}
+        <SectionCard>
+          <SectionCardHeader eyebrow="PERFORMANCE" title="Profit & loss" />
+          <div className="grid divide-y divide-[var(--line)]">
+            <div className="px-5 py-4">
+              <p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Daily P&L</p>
+              <div className="flex items-baseline gap-2">
+                <TrendingUp size={16} className="text-green-500" />
+                <p className="text-[21px] font-semibold tracking-[-0.045em] text-[var(--ink)]">{pnl?.daily || "—"}</p>
+              </div>
+              <p className="mt-1 text-[11px] leading-4 text-green-500 font-medium">+1.8% on deployed capital</p>
+              {chartData?.daily && <div className="mt-3"><MiniSparkline data={chartData.daily} /></div>}
+            </div>
+            <div className="px-5 py-4">
+              <p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Overall P&L</p>
+              <div className="flex items-baseline gap-2">
+                <TrendingUp size={16} className="text-green-500" />
+                <p className="text-[21px] font-semibold tracking-[-0.045em] text-[var(--ink)]">{pnl?.overall || "—"}</p>
+              </div>
+              <p className="mt-1 text-[11px] leading-4 text-green-500 font-medium">+12.4% since Feb 2026</p>
+              {chartData?.overall && <div className="mt-3"><MiniSparkline data={chartData.overall} /></div>}
+            </div>
+          </div>
+        </SectionCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
@@ -182,28 +219,11 @@ export function DashboardOverviewEnhanced() {
           </div>
         </SectionCard>
 
-        {/* Profit & Loss */}
+        {/* Account Configuration - Placeholder */}
         <SectionCard>
-          <SectionCardHeader eyebrow="PERFORMANCE" title="Profit & loss" />
-          <div className="grid divide-x divide-[var(--line)] sm:grid-cols-2">
-            <div className="px-5 py-4">
-              <p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Daily P&L</p>
-              <div className="flex items-baseline gap-2">
-                <TrendingUp size={16} className="text-green-500" />
-                <p className="text-[21px] font-semibold tracking-[-0.045em] text-[var(--ink)]">{pnl?.daily || "—"}</p>
-              </div>
-              <p className="mt-1 text-[11px] leading-4 text-green-500 font-medium">+1.8% on deployed capital</p>
-              {chartData?.daily && <div className="mt-3"><MiniSparkline data={chartData.daily} /></div>}
-            </div>
-            <div className="px-5 py-4">
-              <p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Overall P&L</p>
-              <div className="flex items-baseline gap-2">
-                <TrendingUp size={16} className="text-green-500" />
-                <p className="text-[21px] font-semibold tracking-[-0.045em] text-[var(--ink)]">{pnl?.overall || "—"}</p>
-              </div>
-              <p className="mt-1 text-[11px] leading-4 text-green-500 font-medium">+12.4% since Feb 2026</p>
-              {chartData?.overall && <div className="mt-3"><MiniSparkline data={chartData.overall} /></div>}
-            </div>
+          <SectionCardHeader eyebrow="ACCOUNT" title="Quick stats" />
+          <div className="px-5 py-4">
+            <p className="text-[12px] text-[var(--ink-muted)]">Account configuration and risk settings</p>
           </div>
         </SectionCard>
       </div>
@@ -232,14 +252,13 @@ export function DashboardOverviewEnhanced() {
 
         {/* Account Configuration */}
         <SectionCard>
-          <SectionCardHeader eyebrow="ACCOUNT CONFIGURATION" title="Subscription, broker & risk" />
+          <SectionCardHeader eyebrow="ACCOUNT CONFIGURATION" title="Subscription & risk" />
           <div className="grid divide-y divide-[var(--line)] sm:grid-cols-2 sm:divide-x sm:divide-y-0">
             <div className="divide-y divide-[var(--line)]">
               <CompactDatum label="Subscription status" value={subscription?.status} highlight />
               <CompactDatum label="Lot size" value={preferences?.lotSize} />
             </div>
             <div className="divide-y divide-[var(--line)]">
-              <CompactDatum label="Broker connection" value={broker?.provider ? `${broker.provider} · ${broker.status}` : "Not connected"} highlight />
               <CompactDatum label="Risk settings" value={preferences?.riskSettings} />
             </div>
           </div>

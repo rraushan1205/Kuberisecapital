@@ -11,15 +11,6 @@ export type AdminUser = {
   created_at: string;
 };
 
-export type ConnectedUser = {
-  user_id: string;
-  email: string;
-  full_name: string | null;
-  provider: string;
-  status: "CONNECTED" | "DISCONNECTED";
-  connected_at: string | null;
-};
-
 export type AdminStrategy = {
   id: string;
   name: string;
@@ -43,4 +34,54 @@ export type AdminAnnouncement = {
   message: string;
   created_by_id: string;
   created_at: string;
+};
+
+export type SubscriptionPlanTier = "BASIC" | "PLUS" | "PRO" | "ELITE" | "MAX";
+
+export type AdminSubscriptionPlan = {
+  id: string;
+  tier: SubscriptionPlanTier;
+  capital: number;
+  nifty_lots: number;
+  sensex_lots: number;
+  bank_nifty_lots: number;
+  is_active: boolean;
+};
+
+export type SubscriptionPlanInput = {
+  tier: SubscriptionPlanTier;
+  capital: number;
+  nifty_lots: number;
+  sensex_lots: number;
+  bank_nifty_lots: number;
+  is_active: boolean;
+};
+
+export type AdminUserDetail = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: "USER" | "ADMIN" | "SUPER_ADMIN";
+  email_verified: boolean;
+  account_status: "PENDING" | "APPROVED" | "REJECTED";
+  subscription_status: "INACTIVE" | "ACTIVE";
+  created_at: string;
+  last_login_at: string | null;
+  
+  // Current subscription plan details
+  current_plan_id: string | null;
+  current_plan_tier: string | null;
+  current_plan_capital: number | null;
+  current_plan_nifty_lots: number | null;
+  current_plan_sensex_lots: number | null;
+  current_plan_bank_nifty_lots: number | null;
+
+  // Subscription request history
+  pending_request_id: string | null;
+  pending_request_plan_tier: string | null;
+};
+
+export type UpdateUserSubscriptionInput = {
+  plan_id: string;
+  notes?: string;
 };

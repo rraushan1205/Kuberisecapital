@@ -55,6 +55,37 @@ class SubscriptionRequestStatus(str, enum.Enum):
     REJECTED = "REJECTED"
 
 
+class RefreshToken(Base):
+    """
+    Refresh tokens for session management with inactivity-based expiration.
+    Supports token rotation and reuse detection for security.
+    """
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_family_id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4, index=True)  # For detecting token reuse
+    token_hash: Mapped[str] = mapped_column(String(512), unique=True, index=True)  # Hashed refresh token
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    absolute_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    
+    # Session configuration
+    inactivity_timeout_minutes: Mapped[int] = mapped_column()  # Role-based idle timeout
+    absolute_max_hours: Mapped[int | None] = mapped_column(nullable=True)  # Optional hard limit
+    
+    # Status and metadata
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    device_info: Mapped[str | None] = mapped_column(String(512), nullable=True)  # User agent
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)  # IPv4/IPv6
+    
+    user: Mapped["User"] = relationship(back_populates="refresh_tokens")
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -70,9 +101,10 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    broker_connections: Mapped[list["BrokerConnection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     current_plan: Mapped["SubscriptionPlan | None"] = relationship(foreign_keys=[current_plan_id])
     subscription_requests: Mapped[list["SubscriptionRequest"]] = relationship(back_populates="user", foreign_keys="[SubscriptionRequest.user_id]", cascade="all, delete-orphan")
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    broker_connections: Mapped[list["BrokerConnection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class BrokerConnection(Base):

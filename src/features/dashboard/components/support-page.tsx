@@ -13,7 +13,7 @@ export function SupportPage() {
       </SectionCard>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <InfoCard icon={<ShieldAlert size={17} />} title="Access & subscription" body="Contact your administrator for approval, account status, or subscription-related questions." />
-        <InfoCard icon={<CircleHelp size={17} />} title="Strategy & broker help" body="For published strategy or broker connection issues, share the relevant account context with your assigned support channel." />
+        <InfoCard icon={<CircleHelp size={17} />} title="Strategy help" body="For published strategy issues, share the relevant account context with your assigned support channel." />
       </div>
     </div>
   );

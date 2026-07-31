@@ -20,14 +20,42 @@ router = APIRouter(prefix="/api/v1/client", tags=["client"])
 
 
 class ProfileData(BaseModel):
-    name: str
-    email: str
-    subscriptionStatus: str
-    connectedBroker: str | None
+    name: str | None
+    subscriptionStatus: str | None
+
+
+class StrategyData(BaseModel):
+    status: str | None
+    selectedName: str | None
+    scriptFileName: str | None
+
+
+class PnlData(BaseModel):
+    daily: str | None
+    overall: str | None
+
+
+class PositionsData(BaseModel):
+    open: int | None
+    closed: int | None
+
+
+class SubscriptionData(BaseModel):
+    status: str | None
+
+
+class PreferencesData(BaseModel):
+    lotSize: str | None
+    riskSettings: str | None
 
 
 class DashboardSnapshot(BaseModel):
-    profile: ProfileData
+    profile: ProfileData | None
+    strategy: StrategyData | None
+    pnl: PnlData | None
+    positions: PositionsData | None
+    subscription: SubscriptionData | None
+    preferences: PreferencesData | None
 
 
 class MarketplaceStrategy(BaseModel):
@@ -38,18 +66,58 @@ class MarketplaceStrategy(BaseModel):
 
 
 @router.get("/dashboard", response_model=DashboardSnapshot)
-def get_dashboard_snapshot(user: CurrentUser) -> DashboardSnapshot:
+def get_dashboard_snapshot(user: CurrentUser, db: DbSession) -> DashboardSnapshot:
     """
     Get dashboard overview data for the authenticated user.
-    Returns profile information and account status.
+    Returns profile information, subscription plan, and account status.
     """
+    # Format subscription status with plan details
+    subscription_status = None
+    subscription_info = None
+    if user.subscription_status == SubscriptionStatus.ACTIVE and user.current_plan_id:
+        plan = db.get(SubscriptionPlan, user.current_plan_id)
+        if plan:
+            # Format as "PRO · Active" or similar
+            tier_name = plan.tier.value.title()
+            subscription_status = f"{tier_name} · Active"
+            # For subscription section, could add renewal date when implemented
+            subscription_info = f"{tier_name} · Active"
+    elif user.subscription_status == SubscriptionStatus.INACTIVE:
+        subscription_status = "Inactive"
+        subscription_info = "Inactive"
+    
+    # Get lot size info from current plan
+    lot_size_info = None
+    if user.current_plan_id:
+        plan = db.get(SubscriptionPlan, user.current_plan_id)
+        if plan:
+            lot_size_info = f"{plan.nifty_lots} lots · NIFTY"
+    
     return DashboardSnapshot(
         profile=ProfileData(
-            name=user.full_name or "User",
-            email=user.email,
-            subscriptionStatus=user.subscription_status.value,
-            connectedBroker=None,  # TODO: Fetch from broker_connections
-        )
+            name=user.full_name,
+            subscriptionStatus=subscription_status,
+        ),
+        strategy=StrategyData(
+            status=None,  # TODO: Implement strategy assignment per user
+            selectedName=None,
+            scriptFileName=None,
+        ),
+        pnl=PnlData(
+            daily=None,  # TODO: Implement P&L tracking
+            overall=None,
+        ),
+        positions=PositionsData(
+            open=None,  # TODO: Implement position tracking
+            closed=None,
+        ),
+        subscription=SubscriptionData(
+            status=subscription_info,
+        ),
+        preferences=PreferencesData(
+            lotSize=lot_size_info,
+            riskSettings=None,  # TODO: Implement user preferences/risk settings
+        ),
     )
 
 
@@ -129,6 +197,18 @@ def view_strategy_file(strategy_id: UUID, _: CurrentUser, db: DbSession) -> dict
         )
 
 
+@router.get("/subscription/current-plan", response_model=SubscriptionPlanOutput | None)
+def get_current_subscription_plan(user: CurrentUser, db: DbSession) -> SubscriptionPlan | None:
+    """
+    Get the user's current active subscription plan.
+    Returns None if user has no active plan.
+    """
+    if user.current_plan_id:
+        plan = db.get(SubscriptionPlan, user.current_plan_id)
+        return plan
+    return None
+
+
 @router.get("/subscription/plans", response_model=list[SubscriptionPlanOutput])
 def get_subscription_plans(_: CurrentUser, db: DbSession) -> list[SubscriptionPlan]:
     """
@@ -200,3 +280,30 @@ def request_subscription_plan(payload: SubscriptionRequestInput, user: CurrentUs
     db.commit()
     db.refresh(request)
     return request
+
+
+@router.delete("/subscription/request/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_subscription_request(request_id: UUID, user: CurrentUser, db: DbSession) -> None:
+    """
+    Cancel a pending subscription request.
+    Users can only cancel their own pending requests.
+    """
+    request = db.get(SubscriptionRequest, request_id)
+    
+    if request is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription request not found.")
+    
+    # Check if the request belongs to the current user
+    if request.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only cancel your own requests.")
+    
+    # Check if the request is still pending
+    if request.status != SubscriptionRequestStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot cancel a request that has already been {request.status.value.lower()}."
+        )
+    
+    # Delete the request
+    db.delete(request)
+    db.commit()

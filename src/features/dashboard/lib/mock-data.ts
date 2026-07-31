@@ -14,7 +14,6 @@ export const MOCK_DASHBOARD_SNAPSHOT: DashboardSnapshot = {
   profile: {
     name: "Raj",
     subscriptionStatus: "Pro · Active",
-    connectedBroker: "Zerodha - Live",
   },
   strategy: {
     status: "Running",
@@ -31,10 +30,6 @@ export const MOCK_DASHBOARD_SNAPSHOT: DashboardSnapshot = {
   },
   subscription: {
     status: "Pro · renews 15 Aug 2026",
-  },
-  broker: {
-    provider: "Zerodha Kite",
-    status: "ID A84521",
   },
   preferences: {
     lotSize: "2 lots · NIFTY",
@@ -231,4 +226,4 @@ export const MOCK_MARKET_TICKER = [
  * Feature flag to toggle between mock data and real API
  * Set to false once API endpoints are ready
  */
-export const USE_MOCK_DATA = true;
+export const USE_MOCK_DATA = false;

@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
 from app.api.dependencies import DbSession
+from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password, verify_password
+from app.middleware.rate_limit import get_limiter
 from app.models.domain import AccountStatus, User, UserRole
 from app.schemas.auth import (
     AccountStatusResponse,
@@ -14,14 +16,32 @@ from app.schemas.auth import (
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+limiter = get_limiter()
 
 
 @router.post("/register", response_model=UserRegistrationOutput, status_code=status.HTTP_201_CREATED)
-def register_user(payload: UserRegistrationInput, db: DbSession) -> UserRegistrationOutput:
+@limiter.limit("3/hour")
+def register_user(payload: UserRegistrationInput, request: Request, db: DbSession) -> UserRegistrationOutput:
     """
     Register a new user account. The account will be in PENDING status
     and requires admin approval before the user can access the system.
     """
+    configured_codes = {
+        code.strip().upper()
+        for code in get_settings().registration_invitation_codes
+        if code.strip()
+    }
+    if not configured_codes:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration is temporarily unavailable. Please contact support.",
+        )
+    if payload.invitation_code.strip().upper() not in configured_codes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This invitation code is not active.",
+        )
+
     email_normalized = payload.email.strip().lower()
     
     # Check if user already exists
@@ -52,7 +72,8 @@ def register_user(payload: UserRegistrationInput, db: DbSession) -> UserRegistra
 
 
 @router.post("/login", response_model=UserLoginOutput)
-def login_user(payload: UserLoginInput, db: DbSession) -> UserLoginOutput:
+@limiter.limit("5/minute")
+def login_user(payload: UserLoginInput, request: Request, db: DbSession) -> UserLoginOutput:
     """
     Authenticate a user and return an access token.
     Only users with APPROVED account status can log in.

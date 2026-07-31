@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getStrategyFileView, getStrategyDownloadUrl } from "@/features/dashboard/api/dashboard-api";
+import { useState } from "react";
+import { downloadStrategyFile, getStrategyFileView } from "@/features/dashboard/api/dashboard-api";
 import { WorkspacePageTitle } from "./workspace-page-title";
 import { Button } from "@/components/ui/button";
 import { Download, ArrowLeft, FileCode } from "lucide-react";
@@ -12,6 +13,19 @@ export function StrategyFileViewer({ strategyId }: { strategyId: string }) {
     queryKey: ["strategy-file-view", strategyId],
     queryFn: () => getStrategyFileView(strategyId),
   });
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    if (!data) return;
+    setDownloading(true);
+    try {
+      await downloadStrategyFile(strategyId, data.filename);
+    } catch {
+      // Surface the failure without leaving the viewer.
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -76,14 +90,9 @@ export function StrategyFileViewer({ strategyId }: { strategyId: string }) {
                 Back
               </Link>
             </Button>
-            <Button asChild variant="default" size="sm">
-              <a
-                href={getStrategyDownloadUrl(strategyId)}
-                download={data.filename}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </a>
+            <Button variant="default" size="sm" onClick={handleDownload} disabled={downloading}>
+              <Download className="h-4 w-4 mr-2" />
+              {downloading ? "Downloading…" : "Download"}
             </Button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bell, ClipboardList, FileCode2, RadioTower, Users, UserRoundCheck, UserRoundPlus } from "lucide-react";
+import { ArrowRight, Bell, ClipboardList, FileCode2, Users, UserRoundCheck, UserRoundPlus } from "lucide-react";
 import Link from "next/link";
 import { SectionCard, SectionCardHeader } from "@/components/ui/section-card";
 import { AdminPageTitle } from "@/features/admin/components/admin-page-title";
@@ -9,7 +9,6 @@ const modules = [
   { href: "/admin/users", title: "User management", body: "Review registered account records.", icon: Users },
   { href: "/admin/pending-registrations", title: "Pending registrations", body: "Review registrations awaiting account action.", icon: UserRoundPlus },
   { href: "/admin/subscriptions", title: "Subscription approval", body: "Activate eligible user subscriptions.", icon: UserRoundCheck },
-  { href: "/admin/connected-users", title: "Connected users", body: "View current broker connection records.", icon: RadioTower },
   { href: "/admin/strategies", title: "Strategies", body: "Upload and control approved strategy files.", icon: FileCode2 },
   { href: "/admin/logs", title: "Execution logs", body: "Review logged execution commands.", icon: ClipboardList },
   { href: "/admin/announcements", title: "Announcements", body: "Create and review administrative announcements.", icon: Bell },

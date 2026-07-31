@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Clock, XCircle, IndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { authHeader } from "@/lib/session-storage";
 import { AdminPageTitle } from "./admin-page-title";
 import { AdminDataState } from "./admin-data-state";
 
@@ -44,6 +45,7 @@ export function SubscriptionRequestsPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/admin/subscription-requests`, {
         credentials: "include",
+        headers: { Accept: "application/json", ...authHeader("admin") },
       });
 
       if (response.ok) {
@@ -65,7 +67,7 @@ export function SubscriptionRequestsPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/admin/subscription-requests/${requestId}/approve`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader("admin") },
         credentials: "include",
         body: JSON.stringify({ notes: notes.trim() || null }),
       });
@@ -95,7 +97,7 @@ export function SubscriptionRequestsPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/admin/subscription-requests/${requestId}/reject`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader("admin") },
         credentials: "include",
         body: JSON.stringify({ notes: notes.trim() }),
       });

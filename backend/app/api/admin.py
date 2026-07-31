@@ -2,17 +2,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy import func, select
 
 from app.api.dependencies import DbSession, SuperAdmin
 from app.core.config import get_settings
+from app.core.logging import log_admin_action, log_auth_event
 from app.core.security import create_access_token, verify_password
+from app.middleware.rate_limit import get_limiter
 from app.models.domain import (
     AccountStatus,
     Announcement,
-    BrokerConnection,
-    BrokerStatus,
     ExecutionAction,
     ExecutionLog,
     Strategy,
@@ -25,52 +25,102 @@ from app.models.domain import (
     UserRole,
 )
 from app.schemas.admin import (
+    AdminAuthOutput,
     AdminLoginInput,
+    AdminRefreshInput,
     AdminSessionOutput,
     AnnouncementInput,
     AnnouncementOutput,
-    ConnectedUserOutput,
+    DashboardStatsOutput,
     ExecutionLogOutput,
     StrategyOutput,
+    UpdateUserSubscriptionInput,
+    UserDetailOutput,
     UserOutput,
 )
 from app.schemas.subscription import (
     ApproveSubscriptionRequestInput,
     RejectSubscriptionRequestInput,
+    SubscriptionPlanInput,
+    SubscriptionPlanOutput,
     SubscriptionRequestWithDetailsOutput,
 )
 from app.services.trading_engine import dispatch_engine_command
+from app.services.refresh_sessions import (
+    create_refresh_session,
+    revoke_refresh_session,
+    rotate_refresh_session,
+)
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+limiter = get_limiter()
 
 
-@router.post("/auth/login", response_model=AdminSessionOutput)
-def login_admin(payload: AdminLoginInput, response: Response, db: DbSession) -> AdminSessionOutput:
+@router.post("/auth/login", response_model=AdminAuthOutput)
+@limiter.limit("5/minute")
+def login_admin(payload: AdminLoginInput, request: Request, db: DbSession) -> AdminAuthOutput:
     user = db.scalar(select(User).where(User.email == payload.email.strip().lower()))
+
     if user is None or not verify_password(payload.password, user.password_hash):
+        log_auth_event(
+            event_type="admin_login",
+            success=False,
+            email=payload.email,
+            reason="Invalid credentials",
+            ip_address=request.client.host if request.client else None
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
+
     if user.role != UserRole.SUPER_ADMIN:
+        log_auth_event(
+            event_type="admin_login",
+            success=False,
+            email=user.email,
+            user_id=str(user.id),
+            reason="Not a super admin",
+            ip_address=request.client.host if request.client else None
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super Admin access is required.")
 
     user.last_login_at = datetime.now(UTC)
+    refresh_session, raw_refresh_token = create_refresh_session(db, user)
     db.commit()
-    token = create_access_token(str(user.id), user.role.value)
-    response.set_cookie(
-        key="stratum_admin_session",
-        value=token,
-        httponly=True,
-        secure=get_settings().cookie_secure,
-        samesite="lax",
-        max_age=get_settings().jwt_expires_minutes * 60,
-        path="/",
+    access_token = create_access_token(str(user.id), user.role.value, refresh_session.id)
+
+    log_auth_event(
+        event_type="admin_login",
+        success=True,
+        email=user.email,
+        user_id=str(user.id),
+        ip_address=request.client.host if request.client else None
     )
-    return AdminSessionOutput(user_id=user.id, email=user.email, role=user.role)
+
+    return AdminAuthOutput(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+        access_token=access_token,
+        refresh_token=raw_refresh_token,
+    )
+
+
+@router.post("/auth/refresh", response_model=AdminAuthOutput)
+def refresh_admin_session(payload: AdminRefreshInput, db: DbSession) -> AdminAuthOutput:
+    user, refresh_session, raw_refresh_token = rotate_refresh_session(db, payload.refresh_token, UserRole.SUPER_ADMIN)
+    access_token = create_access_token(str(user.id), user.role.value, refresh_session.id)
+    return AdminAuthOutput(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+        access_token=access_token,
+        refresh_token=raw_refresh_token,
+    )
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout_admin(_: SuperAdmin, response: Response) -> Response:
-    response.delete_cookie("stratum_admin_session", path="/")
-    return response
+def logout_admin(payload: AdminRefreshInput, db: DbSession) -> Response:
+    revoke_refresh_session(db, payload.refresh_token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/auth/session", response_model=AdminSessionOutput)
@@ -78,9 +128,142 @@ def get_admin_session(admin: SuperAdmin) -> AdminSessionOutput:
     return AdminSessionOutput(user_id=admin.id, email=admin.email, role=admin.role)
 
 
+@router.get("/dashboard", response_model=DashboardStatsOutput)
+def get_dashboard_stats(_: SuperAdmin, db: DbSession) -> DashboardStatsOutput:
+    """
+    Get admin dashboard statistics.
+    Returns counts for key metrics across the platform.
+    """
+    total_users = db.scalar(select(func.count()).select_from(User).where(User.role == UserRole.USER)) or 0
+    pending_registrations = db.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(User.account_status == AccountStatus.PENDING, User.role == UserRole.USER)
+    ) or 0
+    active_subscriptions = db.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(User.subscription_status == SubscriptionStatus.ACTIVE, User.role == UserRole.USER)
+    ) or 0
+    active_strategies = db.scalar(
+        select(func.count())
+        .select_from(Strategy)
+        .where(Strategy.status == StrategyStatus.RUNNING)
+    ) or 0
+    total_execution_logs = db.scalar(select(func.count()).select_from(ExecutionLog)) or 0
+    
+    return DashboardStatsOutput(
+        total_users=total_users,
+        pending_registrations=pending_registrations,
+        active_subscriptions=active_subscriptions,
+        active_strategies=active_strategies,
+        total_execution_logs=total_execution_logs,
+    )
+
+
 @router.get("/users", response_model=list[UserOutput])
 def list_users(_: SuperAdmin, db: DbSession) -> list[User]:
     return list(db.scalars(select(User).order_by(User.created_at.desc())))
+
+
+@router.get("/users/{user_id}", response_model=UserDetailOutput)
+def get_user_detail(user_id: UUID, _: SuperAdmin, db: DbSession) -> UserDetailOutput:
+    """
+    Get detailed information about a specific user including subscription details.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    
+    # Get current plan details
+    current_plan = None
+    if user.current_plan_id:
+        current_plan = db.get(SubscriptionPlan, user.current_plan_id)
+    
+    # Get pending subscription request
+    pending_request_statement = select(SubscriptionRequest, SubscriptionPlan).join(
+        SubscriptionPlan, SubscriptionRequest.plan_id == SubscriptionPlan.id
+    ).where(
+        SubscriptionRequest.user_id == user_id,
+        SubscriptionRequest.status == SubscriptionRequestStatus.PENDING
+    ).order_by(SubscriptionRequest.requested_at.desc())
+    
+    pending_request_result = db.execute(pending_request_statement).first()
+    pending_request_id = None
+    pending_request_plan_tier = None
+    if pending_request_result:
+        request, plan = pending_request_result
+        pending_request_id = request.id
+        pending_request_plan_tier = plan.tier.value
+    
+    return UserDetailOutput(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        email_verified=user.email_verified,
+        account_status=user.account_status,
+        subscription_status=user.subscription_status,
+        created_at=user.created_at,
+        last_login_at=user.last_login_at,
+        current_plan_id=user.current_plan_id,
+        current_plan_tier=current_plan.tier.value if current_plan else None,
+        current_plan_capital=current_plan.capital if current_plan else None,
+        current_plan_nifty_lots=current_plan.nifty_lots if current_plan else None,
+        current_plan_sensex_lots=current_plan.sensex_lots if current_plan else None,
+        current_plan_bank_nifty_lots=current_plan.bank_nifty_lots if current_plan else None,
+        pending_request_id=pending_request_id,
+        pending_request_plan_tier=pending_request_plan_tier,
+    )
+
+
+@router.put("/users/{user_id}/subscription", response_model=UserDetailOutput)
+def update_user_subscription(
+    user_id: UUID,
+    payload: UpdateUserSubscriptionInput,
+    admin: SuperAdmin,
+    db: DbSession
+) -> UserDetailOutput:
+    """
+    Update a user's subscription plan directly.
+    Super admin can change or assign subscription plans without request approval flow.
+    """
+    user = db.get(User, user_id)
+    if user is None or user.role != UserRole.USER:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    
+    plan = db.get(SubscriptionPlan, payload.plan_id)
+    if plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription plan not found.")
+    
+    if not plan.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot assign an inactive subscription plan."
+        )
+    
+    # Update user's subscription
+    old_plan_id = user.current_plan_id
+    user.current_plan_id = plan.id
+    user.subscription_status = SubscriptionStatus.ACTIVE
+    
+    # Create a log entry in subscription requests for audit trail
+    request = SubscriptionRequest(
+        user_id=user_id,
+        plan_id=plan.id,
+        status=SubscriptionRequestStatus.APPROVED,
+        requested_at=datetime.now(UTC),
+        reviewed_at=datetime.now(UTC),
+        reviewed_by_id=admin.id,
+        notes=f"Direct subscription update by admin. {payload.notes or ''}".strip()
+    )
+    db.add(request)
+    
+    db.commit()
+    db.refresh(user)
+    
+    # Return updated user detail
+    return get_user_detail(user_id, admin, db)
 
 
 @router.get("/pending-registrations", response_model=list[UserOutput])
@@ -90,7 +273,7 @@ def list_pending_registrations(_: SuperAdmin, db: DbSession) -> list[User]:
 
 
 @router.post("/users/{user_id}/approve", response_model=UserOutput)
-def approve_user_account(user_id: UUID, _: SuperAdmin, db: DbSession) -> User:
+def approve_user_account(user_id: UUID, admin: SuperAdmin, db: DbSession) -> User:
     """
     Approve a pending user registration.
     Sets account_status to APPROVED and allows the user to login.
@@ -98,13 +281,22 @@ def approve_user_account(user_id: UUID, _: SuperAdmin, db: DbSession) -> User:
     user = db.get(User, user_id)
     if user is None or user.role != UserRole.USER:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account was not found.")
-    
+
     if user.account_status == AccountStatus.APPROVED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User account is already approved.")
-    
+
     user.account_status = AccountStatus.APPROVED
     db.commit()
     db.refresh(user)
+
+    log_admin_action(
+        action="approve_user",
+        admin_id=str(admin.id),
+        target_id=str(user.id),
+        target_type="user",
+        details={"email": user.email}
+    )
+
     return user
 
 
@@ -142,27 +334,6 @@ def approve_subscription(user_id: UUID, _: SuperAdmin, db: DbSession) -> User:
     return user
 
 
-@router.get("/connected-users", response_model=list[ConnectedUserOutput])
-def list_connected_users(_: SuperAdmin, db: DbSession) -> list[ConnectedUserOutput]:
-    statement = (
-        select(BrokerConnection, User)
-        .join(User, BrokerConnection.user_id == User.id)
-        .where(BrokerConnection.status == BrokerStatus.CONNECTED)
-        .order_by(BrokerConnection.connected_at.desc())
-    )
-    return [
-        ConnectedUserOutput(
-            user_id=user.id,
-            email=user.email,
-            full_name=user.full_name,
-            provider=connection.provider,
-            status=connection.status,
-            connected_at=connection.connected_at,
-        )
-        for connection, user in db.execute(statement).all()
-    ]
-
-
 @router.get("/strategies", response_model=list[StrategyOutput])
 def list_strategies(_: SuperAdmin, db: DbSession) -> list[Strategy]:
     return list(db.scalars(select(Strategy).order_by(Strategy.created_at.desc())))
@@ -189,6 +360,35 @@ async def upload_strategy(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The strategy file is empty.")
     if len(contents) > 1_048_576:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Strategy files are limited to 1 MB.")
+
+    # Validate Python syntax
+    import ast
+    try:
+        ast.parse(contents.decode('utf-8'))
+    except SyntaxError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid Python syntax: {str(e)}"
+        )
+
+    # Scan for dangerous code patterns
+    content_str = contents.decode('utf-8')
+    dangerous_patterns = [
+        ("import os", "Operating system access"),
+        ("import subprocess", "Subprocess execution"),
+        ("eval(", "Code evaluation"),
+        ("exec(", "Code execution"),
+        ("__import__", "Dynamic imports"),
+        ("open(", "File operations"),
+        ("compile(", "Code compilation"),
+    ]
+
+    for pattern, description in dangerous_patterns:
+        if pattern in content_str:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Forbidden code pattern detected: {description} ({pattern})"
+            )
 
     storage_path = get_settings().strategy_storage_path
     storage_path.mkdir(parents=True, exist_ok=True)
@@ -359,6 +559,132 @@ def approve_subscription_request(
         reviewed_by_id=request.reviewed_by_id,
         notes=request.notes,
     )
+
+
+@router.get("/subscription-plans", response_model=list[SubscriptionPlanOutput])
+def list_subscription_plans(_: SuperAdmin, db: DbSession) -> list[SubscriptionPlan]:
+    """
+    Get all subscription plans.
+    Returns all plans ordered by capital (ascending).
+    """
+    statement = select(SubscriptionPlan).order_by(SubscriptionPlan.capital.asc())
+    return list(db.scalars(statement))
+
+
+@router.post("/subscription-plans", response_model=SubscriptionPlanOutput, status_code=status.HTTP_201_CREATED)
+def create_subscription_plan(
+    payload: SubscriptionPlanInput,
+    _: SuperAdmin,
+    db: DbSession
+) -> SubscriptionPlan:
+    """
+    Create a new subscription plan.
+    Tier must be unique.
+    """
+    # Check if tier already exists
+    existing = db.scalar(select(SubscriptionPlan).where(SubscriptionPlan.tier == payload.tier))
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A subscription plan with tier {payload.tier.value} already exists."
+        )
+    
+    plan = SubscriptionPlan(
+        tier=payload.tier,
+        capital=payload.capital,
+        nifty_lots=payload.nifty_lots,
+        sensex_lots=payload.sensex_lots,
+        bank_nifty_lots=payload.bank_nifty_lots,
+        is_active=payload.is_active
+    )
+    
+    db.add(plan)
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
+@router.put("/subscription-plans/{plan_id}", response_model=SubscriptionPlanOutput)
+def update_subscription_plan(
+    plan_id: UUID,
+    payload: SubscriptionPlanInput,
+    _: SuperAdmin,
+    db: DbSession
+) -> SubscriptionPlan:
+    """
+    Update an existing subscription plan.
+    All fields can be modified.
+    """
+    plan = db.get(SubscriptionPlan, plan_id)
+    if plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription plan not found.")
+    
+    # Check if changing tier to one that already exists
+    if plan.tier != payload.tier:
+        existing = db.scalar(select(SubscriptionPlan).where(SubscriptionPlan.tier == payload.tier))
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A subscription plan with tier {payload.tier.value} already exists."
+            )
+    
+    # Update all fields
+    plan.tier = payload.tier
+    plan.capital = payload.capital
+    plan.nifty_lots = payload.nifty_lots
+    plan.sensex_lots = payload.sensex_lots
+    plan.bank_nifty_lots = payload.bank_nifty_lots
+    plan.is_active = payload.is_active
+    
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
+@router.delete("/subscription-plans/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_subscription_plan(
+    plan_id: UUID,
+    _: SuperAdmin,
+    db: DbSession
+) -> Response:
+    """
+    Delete a subscription plan.
+    Cannot delete plans that are currently assigned to users.
+    """
+    plan = db.get(SubscriptionPlan, plan_id)
+    if plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription plan not found.")
+    
+    # Check if any users have this plan
+    user_count = db.scalar(
+        select(func.count()).select_from(User).where(User.current_plan_id == plan_id)
+    ) or 0
+    
+    if user_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot delete plan. {user_count} user(s) are currently subscribed to this plan."
+        )
+    
+    # Check if any pending subscription requests reference this plan
+    request_count = db.scalar(
+        select(func.count())
+        .select_from(SubscriptionRequest)
+        .where(
+            SubscriptionRequest.plan_id == plan_id,
+            SubscriptionRequest.status == SubscriptionRequestStatus.PENDING
+        )
+    ) or 0
+    
+    if request_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot delete plan. {request_count} pending subscription request(s) reference this plan."
+        )
+    
+    db.delete(plan)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/subscription-requests/{request_id}/reject")

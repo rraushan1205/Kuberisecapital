@@ -56,3 +56,13 @@ class ApproveSubscriptionRequestInput(BaseModel):
 
 class RejectSubscriptionRequestInput(BaseModel):
     notes: str = Field(min_length=1, max_length=500)
+
+
+class SubscriptionPlanInput(BaseModel):
+    """Input schema for creating or updating a subscription plan."""
+    tier: SubscriptionPlanTier
+    capital: int = Field(gt=0, description="Capital amount in rupees")
+    nifty_lots: int = Field(ge=0, description="Number of Nifty lots")
+    sensex_lots: int = Field(ge=0, description="Number of Sensex lots")
+    bank_nifty_lots: int = Field(ge=0, description="Number of Bank Nifty lots")
+    is_active: bool = True

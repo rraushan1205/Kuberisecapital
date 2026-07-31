@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, XCircle, IndianRupee } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, IndianRupee, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { authHeader } from "@/lib/session-storage";
 import { WorkspacePageTitle } from "./workspace-page-title";
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
@@ -36,19 +37,24 @@ const tierDisplayNames: Record<string, string> = {
 };
 
 const tierColors: Record<string, string> = {
-  BASIC: "from-slate-500 to-slate-600",
-  PLUS: "from-blue-500 to-blue-600",
-  PRO: "from-purple-500 to-purple-600",
-  ELITE: "from-amber-500 to-amber-600",
-  MAX: "from-rose-500 to-rose-600",
+  BASIC: "from-slate-400/90 to-slate-500/90",
+  PLUS: "from-blue-400/90 to-blue-500/90",
+  PRO: "from-violet-400/90 to-violet-500/90",
+  ELITE: "from-amber-400/90 to-amber-500/90",
+  MAX: "from-rose-400/90 to-rose-500/90",
 };
+
+// Mapping capital values to determine upgrade/downgrade
+const tierOrder = ["BASIC", "PLUS", "PRO", "ELITE", "MAX"];
 
 export function SubscriptionPage() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [requests, setRequests] = useState<SubscriptionRequest[]>([]);
+  const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [requestingPlanId, setRequestingPlanId] = useState<string | null>(null);
+  const [cancelingRequestId, setCancelingRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -57,9 +63,10 @@ export function SubscriptionPage() {
   async function fetchData() {
     try {
       setError(null);
-      const [plansRes, requestsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/client/subscription/plans`, { credentials: "include" }),
-        fetch(`${API_BASE_URL}/api/v1/client/subscription/my-requests`, { credentials: "include" }),
+      const [plansRes, requestsRes, currentPlanRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/client/subscription/plans`, { credentials: "include", headers: { Accept: "application/json", ...authHeader() } }),
+        fetch(`${API_BASE_URL}/api/v1/client/subscription/my-requests`, { credentials: "include", headers: { Accept: "application/json", ...authHeader() } }),
+        fetch(`${API_BASE_URL}/api/v1/client/subscription/current-plan`, { credentials: "include", headers: { Accept: "application/json", ...authHeader() } }),
       ]);
 
       if (!plansRes.ok) {
@@ -81,6 +88,11 @@ export function SubscriptionPage() {
         const requestsData = await requestsRes.json();
         setRequests(requestsData);
       }
+
+      if (currentPlanRes.ok) {
+        const currentPlanData = await currentPlanRes.json();
+        setCurrentPlan(currentPlanData);
+      }
     } catch (error) {
       console.error("Failed to fetch subscription data:", error);
       setError("Failed to connect to backend server. Please ensure the backend is running.");
@@ -94,7 +106,7 @@ export function SubscriptionPage() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/client/subscription/request`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         credentials: "include",
         body: JSON.stringify({ plan_id: planId }),
       });
@@ -114,8 +126,100 @@ export function SubscriptionPage() {
     }
   }
 
+  async function handleCancelRequest(requestId: string) {
+    if (!confirm("Are you sure you want to cancel this subscription request?")) {
+      return;
+    }
+
+    setCancelingRequestId(requestId);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/client/subscription/request/${requestId}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { Accept: "application/json", ...authHeader() },
+      });
+
+      if (response.ok) {
+        // Refresh data
+        await fetchData();
+      } else {
+        const error = await response.json();
+        alert(error.detail || "Failed to cancel request");
+      }
+    } catch (error) {
+      console.error("Failed to cancel request:", error);
+      alert("Failed to cancel request");
+    } finally {
+      setCancelingRequestId(null);
+    }
+  }
+
   function getPlanRequestStatus(planId: string): SubscriptionRequest | undefined {
     return requests.find((r) => r.plan_id === planId && r.status === "PENDING");
+  }
+
+  function isCurrentPlan(planId: string): boolean {
+    return currentPlan?.id === planId;
+  }
+
+  function getButtonState(plan: SubscriptionPlan): {
+    label: string;
+    variant: "default" | "secondary" | "outline" | "quiet";
+    disabled: boolean;
+    action: (() => void) | null;
+  } {
+    const pendingRequest = getPlanRequestStatus(plan.id);
+    const isRequesting = requestingPlanId === plan.id;
+
+    // Current active plan
+    if (isCurrentPlan(plan.id)) {
+      return {
+        label: "Current Plan",
+        variant: "secondary",
+        disabled: true,
+        action: null,
+      };
+    }
+
+    // Pending request for this plan
+    if (pendingRequest) {
+      return {
+        label: "Pending Approval",
+        variant: "outline",
+        disabled: false,
+        action: () => handleCancelRequest(pendingRequest.id),
+      };
+    }
+
+    // Determine if upgrade or downgrade
+    if (currentPlan) {
+      const currentIndex = tierOrder.indexOf(currentPlan.tier);
+      const targetIndex = tierOrder.indexOf(plan.tier);
+
+      if (targetIndex > currentIndex) {
+        return {
+          label: isRequesting ? "Requesting..." : "Upgrade Plan",
+          variant: "default",
+          disabled: isRequesting,
+          action: () => handleRequestPlan(plan.id),
+        };
+      } else {
+        return {
+          label: isRequesting ? "Requesting..." : "Downgrade Plan",
+          variant: "default",
+          disabled: isRequesting,
+          action: () => handleRequestPlan(plan.id),
+        };
+      }
+    }
+
+    // No current plan
+    return {
+      label: isRequesting ? "Requesting..." : "Request Plan",
+      variant: "default",
+      disabled: isRequesting,
+      action: () => handleRequestPlan(plan.id),
+    };
   }
 
   function formatCurrency(amount: number): string {
@@ -209,70 +313,92 @@ export function SubscriptionPage() {
         </div>
       )}
 
-      {/* Plans Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {plans.map((plan) => {
-          const pendingRequest = getPlanRequestStatus(plan.id);
-          const isRequesting = requestingPlanId === plan.id;
+      {/* Plans - Single Row Horizontal Layout */}
+      <div className="overflow-x-auto pb-4">
+        <div className="flex gap-4 min-w-max">
+          {plans.map((plan) => {
+            const buttonState = getButtonState(plan);
+            const isCanceling = cancelingRequestId === getPlanRequestStatus(plan.id)?.id;
 
-          return (
-            <div
-              key={plan.id}
-              className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden flex flex-col"
-            >
-              {/* Header with gradient */}
+            return (
               <div
-                className={`bg-gradient-to-br ${
-                  tierColors[plan.tier] || "from-gray-500 to-gray-600"
-                } p-6 text-white`}
+                key={plan.id}
+                className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden flex flex-col w-64 flex-shrink-0"
               >
-                <h3 className="text-2xl font-bold">{tierDisplayNames[plan.tier] || plan.tier}</h3>
-                <div className="flex items-baseline gap-1 mt-2">
-                  <IndianRupee className="h-5 w-5" />
-                  <span className="text-3xl font-bold">{formatCurrency(plan.capital)}</span>
+                {/* Header with gradient */}
+                <div
+                  className={`bg-gradient-to-br ${
+                    tierColors[plan.tier] || "from-gray-400/90 to-gray-500/90"
+                  } p-5 text-white relative`}
+                >
+                  <h3 className="text-xl font-semibold">{tierDisplayNames[plan.tier] || plan.tier}</h3>
+                  <div className="flex items-baseline gap-1 mt-2">
+                    <IndianRupee className="h-4 w-4" />
+                    <span className="text-2xl font-semibold">{formatCurrency(plan.capital)}</span>
+                  </div>
+                  <p className="text-xs opacity-90 mt-1">Capital Requirement</p>
+                  
+                  {/* Current Plan Badge */}
+                  {isCurrentPlan(plan.id) && (
+                    <div className="absolute top-3 right-3 bg-white/20 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded">
+                      Active
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm opacity-90 mt-1">Capital Requirement</p>
-              </div>
 
-              {/* Plan Details */}
-              <div className="p-6 flex-1">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="text-sm text-muted-foreground">Nifty Lots</span>
-                    <span className="font-semibold">{plan.nifty_lots}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="text-sm text-muted-foreground">Sensex Lots</span>
-                    <span className="font-semibold">{plan.sensex_lots}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-muted-foreground">Bank Nifty Lots</span>
-                    <span className="font-semibold">{plan.bank_nifty_lots}</span>
+                {/* Plan Details */}
+                <div className="p-5 flex-1">
+                  <div className="space-y-2.5">
+                    <div className="flex justify-between items-center py-1.5 border-b border-border/40">
+                      <span className="text-xs text-muted-foreground">Nifty Lots</span>
+                      <span className="font-medium text-sm">{plan.nifty_lots}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5 border-b border-border/40">
+                      <span className="text-xs text-muted-foreground">Sensex Lots</span>
+                      <span className="font-medium text-sm">{plan.sensex_lots}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1.5">
+                      <span className="text-xs text-muted-foreground">Bank Nifty Lots</span>
+                      <span className="font-medium text-sm">{plan.bank_nifty_lots}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Action Button */}
-              <div className="p-6 pt-0">
-                {pendingRequest ? (
-                  <div className="flex items-center justify-center gap-2 py-3 px-4 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 rounded-md border border-amber-200 dark:border-amber-900">
-                    <Clock className="h-4 w-4" />
-                    <span className="text-sm font-medium">Pending Approval</span>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={() => handleRequestPlan(plan.id)}
-                    disabled={isRequesting}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {isRequesting ? "Requesting..." : "Request Plan"}
-                  </Button>
-                )}
+                {/* Action Button */}
+                <div className="p-5 pt-0">
+                  {buttonState.label === "Pending Approval" ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-900">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span className="text-xs font-medium">Pending</span>
+                      </div>
+                      <Button
+                        onClick={buttonState.action || undefined}
+                        disabled={isCanceling}
+                        variant="quiet"
+                        size="sm"
+                        className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive"
+                        title="Cancel request"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={buttonState.action || undefined}
+                      disabled={buttonState.disabled}
+                      variant={buttonState.variant}
+                      className="w-full"
+                      size="sm"
+                    >
+                      {buttonState.label}
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Request History */}

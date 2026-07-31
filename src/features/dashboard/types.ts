@@ -1,10 +1,7 @@
-export type BrokerProvider = "fyers" | "groww";
-
 export type DashboardSnapshot = {
   profile?: {
     name?: string | null;
     subscriptionStatus?: string | null;
-    connectedBroker?: string | null;
   } | null;
   strategy?: {
     status?: string | null;
@@ -20,10 +17,6 @@ export type DashboardSnapshot = {
     closed?: number | null;
   } | null;
   subscription?: {
-    status?: string | null;
-  } | null;
-  broker?: {
-    provider?: string | null;
     status?: string | null;
   } | null;
   preferences?: {

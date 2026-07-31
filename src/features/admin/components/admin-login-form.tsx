@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthHeading, FieldBlock, PasswordField, SubmitLabel } from "@/components/auth-primitives";
@@ -15,6 +16,14 @@ export function AdminLoginForm() {
   const router = useRouter();
   const form = useForm<LoginValues>({ resolver: zodResolver(schema), mode: "onBlur", defaultValues: { email: "", password: "" } });
   const { errors, isSubmitting } = form.formState;
+  useEffect(() => {
+    let active = true;
+    adminApi.refresh()
+      .then(() => { if (active) router.replace("/admin/dashboard"); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [router]);
+
   async function onSubmit(values: LoginValues) {
     try { await adminApi.login(values.email, values.password); router.replace("/admin/dashboard"); }
     catch (error) { form.setError("root", { message: error instanceof AdminApiError ? error.message : "Admin sign-in could not be completed." }); }

@@ -1,30 +1,42 @@
-export type AccountStatus = "APPROVED" | "PENDING" | "REJECTED";
+import { clearSession, getRefreshToken, setSession } from "@/lib/session-storage";
 
-export interface LoginResponse {
-  access_token: string;
-  token_type: string;
-  user: {
-    id: string;
-    email: string;
-    full_name: string | null;
-    role: string;
-    account_status: string;
-    email_verified: boolean;
-  };
-}
+export type AccountStatus = "APPROVED" | "PENDING" | "REJECTED";
 
 export interface RegisterResponse {
   message: string;
   email: string;
 }
 
-export interface AccountStatusResponse {
+interface ClientSessionPayload {
+  user_id: string;
   email: string;
   account_status: string;
-  message: string;
+  access_token: string;
+  refresh_token: string;
 }
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+let refreshInFlight: Promise<AccountStatus> | null = null;
+
+export async function refreshClientSession(): Promise<AccountStatus> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) throw new Error("Your session could not be refreshed.");
+      const response = await fetch(`${apiBaseUrl}/api/v1/client/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!response.ok) throw new Error("Your session could not be refreshed.");
+      const data = await response.json() as ClientSessionPayload;
+      setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+      return data.account_status as AccountStatus;
+    })().finally(() => { refreshInFlight = null; });
+  }
+  return refreshInFlight;
+}
 
 export async function login(email: string, password: string): Promise<AccountStatus> {
   const response = await fetch(`${apiBaseUrl}/api/v1/client/auth/login`, {
@@ -45,7 +57,8 @@ export async function login(email: string, password: string): Promise<AccountSta
     throw new Error("Unable to sign in right now.");
   }
 
-  const data = await response.json() as { account_status: string };
+  const data = await response.json() as ClientSessionPayload;
+  setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
   return data.account_status as AccountStatus;
 }
 
@@ -53,8 +66,7 @@ export async function registerUser(
   email: string,
   password: string,
   fullName: string,
-  phoneNumber?: string,
-  invitationCode?: string
+  invitationCode: string,
 ): Promise<RegisterResponse> {
   const response = await fetch(`${apiBaseUrl}/api/v1/auth/register`, {
     method: "POST",
@@ -64,7 +76,6 @@ export async function registerUser(
       email,
       password,
       full_name: fullName,
-      phone_number: phoneNumber,
       invitation_code: invitationCode,
     }),
   });
@@ -81,9 +92,17 @@ export async function registerUser(
 }
 
 export async function logout(): Promise<void> {
-  await fetch(`${apiBaseUrl}/api/v1/client/auth/logout`, {
-    method: "POST",
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
+  const refreshToken = getRefreshToken();
+  try {
+    if (refreshToken) {
+      await fetch(`${apiBaseUrl}/api/v1/client/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+    }
+  } finally {
+    clearSession();
+  }
 }

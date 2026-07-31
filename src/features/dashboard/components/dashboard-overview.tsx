@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Building2, FileCode2, ShieldCheck, Store } from "lucide-react";
+import { ArrowRight, FileCode2, ShieldCheck, Store } from "lucide-react";
 import Link from "next/link";
 import { DataError } from "@/components/ui/data-state";
 import { SectionCard, SectionCardHeader } from "@/components/ui/section-card";
@@ -39,7 +39,6 @@ export function DashboardOverview() {
   const pnl = data?.pnl;
   const positions = data?.positions;
   const subscription = data?.subscription;
-  const broker = data?.broker;
   const preferences = data?.preferences;
 
   return (
@@ -49,7 +48,7 @@ export function DashboardOverview() {
           <p className="mb-2 font-mono text-[10px] font-medium tracking-[0.13em] text-[var(--accent)]">CLIENT WORKSPACE</p>
           <h1 className="text-[27px] font-semibold tracking-[-0.05em] text-[var(--ink)] sm:text-[31px]">Account overview</h1>
         </div>
-        <p className="max-w-sm text-[12px] leading-5 text-[var(--ink-muted)]">Your account, strategy, and broker information in one controlled view.</p>
+        <p className="max-w-sm text-[12px] leading-5 text-[var(--ink-muted)]">Your account and strategy information in one controlled view.</p>
       </div>
 
       {isError && <DataError message="Dashboard data is unavailable. Existing values will appear when the account service reconnects." />}
@@ -87,8 +86,7 @@ export function DashboardOverview() {
 
       <SectionCard className="overflow-hidden">
         <SectionCardHeader eyebrow="NEXT STEPS" title="Account setup guidance" />
-        <div className="grid divide-y divide-[var(--line)] md:grid-cols-3 md:divide-x md:divide-y-0">
-          <Guidance icon={<Building2 size={16} />} title="Connect an approved broker" body="A broker connection is needed before your account can route orders." href="/dashboard/broker" />
+        <div className="grid divide-y divide-[var(--line)] md:grid-cols-2 md:divide-x md:divide-y-0">
           <Guidance icon={<Store size={16} />} title="Review marketplace availability" body="Strategies are published by an administrator and remain read-only here." href="/dashboard/marketplace" />
           <Guidance icon={<ShieldCheck size={16} />} title="Confirm account controls" body="Check your subscription, lot size, and risk settings before execution." href="/dashboard/settings" />
         </div>

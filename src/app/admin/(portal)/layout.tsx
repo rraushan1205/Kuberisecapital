@@ -1,5 +1,10 @@
+import { SessionGuard } from "@/components/session-guard";
 import { AdminShell } from "@/features/admin/components/admin-shell";
 
 export default function AdminPortalLayout({ children }: { children: React.ReactNode }) {
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <SessionGuard kind="admin">
+      <AdminShell>{children}</AdminShell>
+    </SessionGuard>
+  );
 }

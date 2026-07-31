@@ -77,6 +77,7 @@ JWT_EXPIRES_MINUTES=480
 COOKIE_SECURE=false
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=AdminPass123!
+REGISTRATION_INVITATION_CODES=["VALID123"]
 BACKEND_CORS_ORIGINS=["http://localhost:3000"]
 STRATEGY_STORAGE_PATH=./storage/strategies
 TRADING_ENGINE_URL=
@@ -112,7 +113,6 @@ Frontend runs at `http://localhost:3000`
 2. Fill form:
    - Full Name: `Test User`
    - Email: `test@example.com`
-   - Phone: `1234567890`
    - Invitation Code: `VALID123`
    - Password: `SecurePass123!`
 3. ✅ Should redirect to "pending approval" page
@@ -273,8 +273,7 @@ Cookie: stratum_token=<jwt_token>
   "profile": {
     "name": "John Doe",
     "email": "user@example.com",
-    "subscriptionStatus": "INACTIVE",
-    "connectedBroker": null
+    "subscriptionStatus": "INACTIVE"
   }
 }
 ```
