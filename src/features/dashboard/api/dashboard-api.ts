@@ -83,3 +83,10 @@ export async function downloadStrategyFile(strategyId: string, filename: string)
   anchor.remove();
   URL.revokeObjectURL(objectUrl);
 }
+
+/**
+ * Generate broker connection URL for OAuth flow
+ */
+export function brokerConnectUrl(provider: string): string {
+  return `${apiBaseUrl}/api/v1/client/brokers/${provider}/connect`;
+}

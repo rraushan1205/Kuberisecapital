@@ -23,6 +23,10 @@ export type DashboardSnapshot = {
     lotSize?: string | null;
     riskSettings?: string | null;
   } | null;
+  broker?: {
+    provider?: string | null;
+    status?: string | null;
+  } | null;
 };
 
 export type MarketplaceStrategy = {

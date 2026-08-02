@@ -80,3 +80,14 @@ test_*.py
 test-*.sh
 debug_*.py
 scratch_*.py
+
+# One-off debugging scripts and reports - not part of the project
+/apply_*.sh
+/setup-dev.sh
+/start-dev.sh
+/CONTRIBUTOR_ONBOARDING_SUMMARY.md
+/FYERS_*.md
+/IMPLEMENTATION_SUMMARY.md
+/PROJECT_CONTEXT.md
+/QUICKSTART_FOR_CONTRIBUTOR*.md
+/stratum-clean.zip

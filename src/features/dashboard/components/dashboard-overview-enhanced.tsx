@@ -6,7 +6,6 @@ import { SectionCard, SectionCardHeader } from "@/components/ui/section-card";
 import { TradingCalendar } from "@/components/trading-calendar/TradingCalendar";
 import { useDashboardSnapshot, usePositions, useExecutionLogs, usePnlChartData } from "@/features/dashboard/hooks/use-dashboard-data";
 import type { Position, ExecutionLog } from "@/features/dashboard/lib/mock-data";
-import { TradingCalendar } from "@/components/trading-calendar/TradingCalendar";
 
 function SnapshotValue({ label, value, detail, trend }: { label: string; value?: string | number | null; detail?: string; trend?: string }) {
   const available = value !== null && value !== undefined && value !== "";
