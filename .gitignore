@@ -74,3 +74,9 @@ temp/
 
 # Reticle
 .reticle/
+
+# Scratch/test scripts (should not be committed to main repo)
+test_*.py
+test-*.sh
+debug_*.py
+scratch_*.py

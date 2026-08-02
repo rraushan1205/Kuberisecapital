@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     fyers_secret_id: str | None = None
     fyers_redirect_uri: str | None = None
 
+    # Frontend base URL for post-OAuth redirects
+    frontend_url: str = "http://localhost:3000"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @field_validator("admin_email")

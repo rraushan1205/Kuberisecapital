@@ -19,58 +19,67 @@ export function CalendarDay({
   onClick,
 }: CalendarDayProps) {
   const hasTrades = summary && summary.trades > 0;
-  const pnl = summary?.pnl ?? 0;
-  const isPositive = pnl > 0;
-  const isNegative = pnl < 0;
-
-  // Color is the only signal — no text inside cells
-  let cellColor = "bg-[#232a35]";
-
-  if (hasTrades) {
-    if (isPositive) {
-      cellColor = "bg-[#1d4736]";
-    } else if (isNegative) {
-      cellColor = "bg-[#4a2628]";
-    }
-  } else if (!isCurrentMonth) {
-    cellColor = "bg-transparent";
-  }
+  const pnl = summary?.pnl;
+  const isPositive = pnl !== undefined && pnl > 0;
+  const isNegative = pnl !== undefined && pnl < 0;
 
   const isClickable = isCurrentMonth && hasTrades;
 
-  return (
-  <button
-    type="button"
-    onClick={isClickable ? onClick : undefined}
-    disabled={!isClickable}
-    className={cn(
-      "relative aspect-square w-full rounded-xl transition-all duration-200 flex items-center justify-center",
-      cellColor,
-      isToday
-        ? "ring-2 ring-[var(--accent)]"
-        : "",
-      isClickable
-        ? "cursor-pointer hover:scale-105 hover:shadow-lg"
-        : "cursor-default"
-    )}
-    aria-label={
-      isCurrentMonth
-        ? hasTrades
-          ? `Day ${day}`
-          : `Day ${day}`
-        : undefined
+  // Color mapping for day numbers based on P&L magnitude
+  let numberColor = "text-[var(--ink-subtle)] opacity-50 font-normal"; // Default muted for no activity
+
+  if (!isCurrentMonth) {
+    // Previous/next month days - very faded
+    numberColor = "text-[var(--ink-subtle)] opacity-30 font-normal";
+  } else if (isCurrentMonth && hasTrades && pnl !== undefined) {
+    // Current month with actual trading activity
+    const absPnl = Math.abs(pnl);
+    
+    if (isPositive) {
+      // Green shades for profit - 3 tiers
+      if (absPnl >= 50000) {
+        numberColor = "text-[#10b981] font-bold"; // High profit - bright green
+      } else if (absPnl >= 20000) {
+        numberColor = "text-[#34d399] font-semibold"; // Medium profit
+      } else {
+        numberColor = "text-[#6ee7b7] font-medium"; // Low profit
+      }
+    } else if (isNegative) {
+      // Red shades for loss - 3 tiers
+      if (absPnl >= 50000) {
+        numberColor = "text-[#ef4444] font-bold"; // High loss - bright red
+      } else if (absPnl >= 20000) {
+        numberColor = "text-[#f87171] font-semibold"; // Medium loss
+      } else {
+        numberColor = "text-[#fca5a5] font-medium"; // Low loss
+      }
     }
-  >
-    <span
+  }
+  // else: stays as default muted color for current month days with no trades
+
+  return (
+    <button
+      type="button"
+      onClick={isClickable ? onClick : undefined}
+      disabled={!isClickable}
       className={cn(
-        "text-sm font-semibold",
-        isCurrentMonth
-          ? "text-white"
-          : "text-[var(--ink-subtle)]"
+        "relative w-[22px] h-[22px] flex items-center justify-center transition-colors duration-150 rounded-sm",
+        isToday && "ring-[1px] ring-[var(--accent)] ring-inset",
+        isClickable
+          ? "cursor-pointer hover:bg-[var(--line)]/30"
+          : "cursor-default"
       )}
+      aria-label={
+        isCurrentMonth
+          ? hasTrades && pnl !== undefined
+            ? `Day ${day}, ${isPositive ? "profit" : "loss"} ${Math.abs(pnl).toFixed(0)}`
+            : `Day ${day}, no trades`
+          : undefined
+      }
     >
-      {day} 
-    </span>
-  </button>
-);  
+      <span className={cn("text-[9px] tabular-nums leading-none", numberColor)}>
+        {day}
+      </span>
+    </button>
+  );
 }

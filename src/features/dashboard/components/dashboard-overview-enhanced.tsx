@@ -6,6 +6,7 @@ import { SectionCard, SectionCardHeader } from "@/components/ui/section-card";
 import { TradingCalendar } from "@/components/trading-calendar/TradingCalendar";
 import { useDashboardSnapshot, usePositions, useExecutionLogs, usePnlChartData } from "@/features/dashboard/hooks/use-dashboard-data";
 import type { Position, ExecutionLog } from "@/features/dashboard/lib/mock-data";
+import { TradingCalendar } from "@/components/trading-calendar/TradingCalendar";
 
 function SnapshotValue({ label, value, detail, trend }: { label: string; value?: string | number | null; detail?: string; trend?: string }) {
   const available = value !== null && value !== undefined && value !== "";
@@ -309,10 +310,17 @@ export function DashboardOverviewEnhanced() {
           </div>
         </SectionCard>
       )}
+
+      {/* Trading Calendar */}
+      <SectionCard>
+        <SectionCardHeader eyebrow="HISTORY" title="Trading P&L Calendar" />
+        <div className="px-5 py-4">
+          <TradingCalendar />
+        </div>
+      </SectionCard>
     </div>
   );
 }
-
 function CompactDatum({ label, value, highlight }: { label: string; value?: string | null; highlight?: boolean }) {
   return (
     <div className="flex min-h-[68px] items-center justify-between gap-3 px-5 py-3.5">

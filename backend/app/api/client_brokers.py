@@ -109,7 +109,7 @@ async def broker_oauth_callback(
     auth_code: str = Query(..., alias="auth_code", description="Authorization code from broker"),
     state: str = Query(..., description="State parameter for CSRF protection"),
     db: DbSession = None,
-) -> dict[str, str]:
+) -> RedirectResponse:
     """
     Handle OAuth callback from broker.
     
@@ -140,6 +140,8 @@ async def broker_oauth_callback(
         redirects the user here, and we cannot include custom headers in that redirect.
     """
     code = auth_code
+    settings = get_settings()
+    frontend_broker_url = f"{settings.frontend_url}/dashboard/broker"
 
     # Get broker provider from registry
     registry = get_global_registry()
@@ -147,9 +149,9 @@ async def broker_oauth_callback(
         broker_class = registry.get(provider)
         broker = broker_class()
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Broker provider '{provider}' is not supported.",
+        return RedirectResponse(
+            url=f"{frontend_broker_url}?error=unsupported_provider&provider={provider}",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
 
     try:
@@ -206,23 +208,22 @@ async def broker_oauth_callback(
 
         db.commit()
 
-        return {
-            "message": "Broker connected successfully",
-            "provider": provider,
-            "status": "connected",
-        }
+        return RedirectResponse(
+            url=f"{frontend_broker_url}?connected=true&provider={provider}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
 
-    except BrokerError as error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Broker authentication failed: {str(error)}",
-        ) from error
-    except Exception as error:
+    except BrokerError:
+        return RedirectResponse(
+            url=f"{frontend_broker_url}?error=broker_auth_failed&provider={provider}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    except Exception:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while connecting to broker.",
-        ) from error
+        return RedirectResponse(
+            url=f"{frontend_broker_url}?error=unexpected&provider={provider}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
 
 
 @router.delete("/{provider}/disconnect")

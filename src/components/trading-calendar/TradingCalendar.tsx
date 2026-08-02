@@ -93,59 +93,57 @@ export function TradingCalendar() {
   }
 
   return (
-    <div className="space-y-3">
-      {/* Month header with navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-[var(--ink)]">{currentMonthName}</span>
+    <div className="max-w-[280px] space-y-1.5">
+      {/* Compact month header with navigation */}
+      <div className="flex items-center justify-between mb-0.5">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[11px] font-semibold text-[var(--ink)]">{currentMonthName}</h3>
           {isLoading && (
-            <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
+            <span className="h-1 w-1 animate-pulse rounded-full bg-[var(--accent)]" />
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={handleToday}
-            className="rounded border border-[var(--line)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--ink-muted)] hover:border-[var(--line-strong)] hover:text-[var(--ink)] transition"
+            className="rounded px-1.5 py-0.5 text-[9px] font-medium text-[var(--ink-muted)] hover:bg-[var(--line)] hover:text-[var(--ink)] transition-colors"
           >
             Today
           </button>
-          <div className="flex items-center rounded border border-[var(--line)] overflow-hidden">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              className="p-0.5 text-[var(--ink-muted)] hover:bg-[var(--line)] hover:text-[var(--ink)] transition border-r border-[var(--line)]"
-              aria-label="Previous month"
-            >
-              <ChevronLeft size={12} />
-            </button>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              className="p-0.5 text-[var(--ink-muted)] hover:bg-[var(--line)] hover:text-[var(--ink)] transition"
-              aria-label="Next month"
-            >
-              <ChevronRight size={12} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handlePrevMonth}
+            className="p-0.5 rounded text-[var(--ink-muted)] hover:bg-[var(--line)] hover:text-[var(--ink)] transition-colors"
+            aria-label="Previous month"
+          >
+            <ChevronLeft size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={handleNextMonth}
+            className="p-0.5 rounded text-[var(--ink-muted)] hover:bg-[var(--line)] hover:text-[var(--ink)] transition-colors"
+            aria-label="Next month"
+          >
+            <ChevronRight size={12} />
+          </button>
         </div>
       </div>
 
       {error && (
-        <p className="text-[10px] text-[var(--danger)]">{error}</p>
+        <p className="text-[9px] text-[var(--danger)] mb-1">{error}</p>
       )}
 
-      {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-1">
+      {/* Compact weekday headers */}
+      <div className="grid grid-cols-7 gap-0.5">
         {weekdays.map((d) => (
-          <div key={d} className="text-center text-[9px] font-mono font-medium text-[var(--ink-subtle)]">
+          <div key={d} className="text-center text-[9px] font-medium text-[var(--ink-subtle)]">
             {d}
           </div>
         ))}
       </div>
 
-      {/* Day cells — heatmap grid */}
-      <div className="grid grid-cols-7 gap-2">
+      {/* Minimal heatmap grid - color-coded day numbers only */}
+      <div className="grid grid-cols-7 gap-0.5">
         {cells.map((cell, idx) => (
           <CalendarDay
             key={`${cell.dateStr}-${idx}`}

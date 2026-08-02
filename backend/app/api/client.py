@@ -9,7 +9,15 @@ from sqlalchemy import select
 
 from app.api.dependencies import CurrentUser, DbSession
 from app.core.config import get_settings
-from app.models.domain import Strategy, SubscriptionPlan, SubscriptionRequest, SubscriptionRequestStatus, SubscriptionStatus
+from app.models.domain import (
+    BrokerConnection,
+    BrokerStatus,
+    Strategy,
+    SubscriptionPlan,
+    SubscriptionRequest,
+    SubscriptionRequestStatus,
+    SubscriptionStatus,
+)
 from app.schemas.subscription import (
     SubscriptionPlanOutput,
     SubscriptionRequestInput,
@@ -49,6 +57,11 @@ class PreferencesData(BaseModel):
     riskSettings: str | None
 
 
+class BrokerData(BaseModel):
+    provider: str | None
+    status: str | None
+
+
 class DashboardSnapshot(BaseModel):
     profile: ProfileData | None
     strategy: StrategyData | None
@@ -56,6 +69,7 @@ class DashboardSnapshot(BaseModel):
     positions: PositionsData | None
     subscription: SubscriptionData | None
     preferences: PreferencesData | None
+    broker: BrokerData | None = None
 
 
 class MarketplaceStrategy(BaseModel):
@@ -69,7 +83,7 @@ class MarketplaceStrategy(BaseModel):
 def get_dashboard_snapshot(user: CurrentUser, db: DbSession) -> DashboardSnapshot:
     """
     Get dashboard overview data for the authenticated user.
-    Returns profile information, subscription plan, and account status.
+    Returns profile information, subscription plan, account status, and broker connection.
     """
     # Format subscription status with plan details
     subscription_status = None
@@ -92,6 +106,21 @@ def get_dashboard_snapshot(user: CurrentUser, db: DbSession) -> DashboardSnapsho
         plan = db.get(SubscriptionPlan, user.current_plan_id)
         if plan:
             lot_size_info = f"{plan.nifty_lots} lots · NIFTY"
+    
+    # Get broker connection info
+    connection = db.scalar(
+        select(BrokerConnection).where(
+            BrokerConnection.user_id == user.id,
+            BrokerConnection.status == BrokerStatus.CONNECTED,
+        )
+    )
+
+    broker_data = None
+    if connection is not None:
+        broker_data = BrokerData(
+            provider=connection.provider,
+            status=connection.status.value,
+        )
     
     return DashboardSnapshot(
         profile=ProfileData(
@@ -118,6 +147,7 @@ def get_dashboard_snapshot(user: CurrentUser, db: DbSession) -> DashboardSnapsho
             lotSize=lot_size_info,
             riskSettings=None,  # TODO: Implement user preferences/risk settings
         ),
+        broker=broker_data,
     )
 
 
@@ -153,157 +183,133 @@ def download_strategy_file(strategy_id: UUID, _: CurrentUser, db: DbSession) -> 
     file_path = storage_path / strategy.script_storage_key
     
     if not file_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Strategy file not found in storage.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Strategy file not found on disk.",
+        )
     
     return FileResponse(
         path=file_path,
         filename=strategy.script_filename,
         media_type="text/x-python",
-        headers={
-            "Content-Disposition": f'attachment; filename="{strategy.script_filename}"',
-            "Cache-Control": "no-cache",
-        }
     )
 
 
-@router.get("/strategies/{strategy_id}/view")
-def view_strategy_file(strategy_id: UUID, _: CurrentUser, db: DbSession) -> dict[str, str]:
+# ─────────────────────────────────────────────────────────────────────────────
+# Subscription Plans & Requests
+# ─────────────────────────────────────────────────────────────────────────────
+@router.get("/subscription-plans", response_model=list[SubscriptionPlanOutput])
+def get_subscription_plans(_: CurrentUser, db: DbSession) -> list[SubscriptionPlanOutput]:
+    """Get all available subscription plans"""
+    plans = db.scalars(select(SubscriptionPlan).where(SubscriptionPlan.is_active == True)).all()
+    return [
+        SubscriptionPlanOutput(
+            id=plan.id,
+            tier=plan.tier,
+            name=plan.name,
+            nifty_lots=plan.nifty_lots,
+            bank_nifty_lots=plan.bank_nifty_lots,
+            fin_nifty_lots=plan.fin_nifty_lots,
+            mid_cap_nifty_lots=plan.mid_cap_nifty_lots,
+            sensex_lots=plan.sensex_lots,
+            bank_ex_lots=plan.bank_ex_lots,
+            monthly_price=plan.monthly_price,
+            quarterly_price=plan.quarterly_price,
+            yearly_price=plan.yearly_price,
+            is_active=plan.is_active,
+            created_at=plan.created_at,
+        )
+        for plan in plans
+    ]
+
+
+@router.post("/subscription-requests", response_model=SubscriptionRequestOutput)
+def create_subscription_request(
+    data: SubscriptionRequestInput, user: CurrentUser, db: DbSession
+) -> SubscriptionRequestOutput:
     """
-    View strategy file contents (read-only).
-    Returns the file content as text for viewing in the browser.
+    Create a new subscription request for the authenticated user.
+    Only users with INACTIVE subscription can request a subscription.
     """
-    strategy = db.get(Strategy, strategy_id)
-    if strategy is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Strategy not found.")
-    
-    storage_path = get_settings().strategy_storage_path
-    file_path = storage_path / strategy.script_storage_key
-    
-    if not file_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Strategy file not found in storage.")
-    
-    try:
-        content = file_path.read_text(encoding="utf-8")
-        return {
-            "filename": strategy.script_filename,
-            "content": content,
-            "readonly": True,
-            "message": "This file is admin-managed and read-only"
-        }
-    except Exception as e:
+    # Check if user already has an active subscription
+    if user.subscription_status == SubscriptionStatus.ACTIVE:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not read strategy file."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User already has an active subscription",
         )
 
+    # Check if plan exists
+    plan = db.get(SubscriptionPlan, data.plan_id)
+    if not plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Subscription plan not found"
+        )
 
-@router.get("/subscription/current-plan", response_model=SubscriptionPlanOutput | None)
-def get_current_subscription_plan(user: CurrentUser, db: DbSession) -> SubscriptionPlan | None:
-    """
-    Get the user's current active subscription plan.
-    Returns None if user has no active plan.
-    """
-    if user.current_plan_id:
-        plan = db.get(SubscriptionPlan, user.current_plan_id)
-        return plan
-    return None
+    # Check for existing pending request
+    existing_request = db.scalar(
+        select(SubscriptionRequest).where(
+            SubscriptionRequest.user_id == user.id,
+            SubscriptionRequest.status == SubscriptionRequestStatus.PENDING,
+        )
+    )
+    if existing_request:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User already has a pending subscription request",
+        )
+
+    # Create new subscription request
+    new_request = SubscriptionRequest(
+        user_id=user.id,
+        plan_id=data.plan_id,
+        billing_cycle=data.billing_cycle,
+        status=SubscriptionRequestStatus.PENDING,
+        payment_screenshot_url=data.payment_screenshot_url,
+        utr_number=data.utr_number,
+        requested_at=datetime.now(UTC),
+    )
+
+    db.add(new_request)
+    db.commit()
+    db.refresh(new_request)
+
+    return SubscriptionRequestOutput(
+        id=new_request.id,
+        user_id=new_request.user_id,
+        plan_id=new_request.plan_id,
+        billing_cycle=new_request.billing_cycle,
+        status=new_request.status,
+        payment_screenshot_url=new_request.payment_screenshot_url,
+        utr_number=new_request.utr_number,
+        requested_at=new_request.requested_at,
+        reviewed_at=new_request.reviewed_at,
+        rejection_reason=new_request.rejection_reason,
+        admin_notes=new_request.admin_notes,
+    )
 
 
-@router.get("/subscription/plans", response_model=list[SubscriptionPlanOutput])
-def get_subscription_plans(_: CurrentUser, db: DbSession) -> list[SubscriptionPlan]:
-    """
-    Get all available subscription plans.
-    Returns all active subscription plans with their details.
-    """
-    plans = db.scalars(
-        select(SubscriptionPlan)
-        .where(SubscriptionPlan.is_active == True)
-        .order_by(SubscriptionPlan.capital.asc())
-    ).all()
-    return list(plans)
-
-
-@router.get("/subscription/my-requests", response_model=list[SubscriptionRequestOutput])
-def get_my_subscription_requests(user: CurrentUser, db: DbSession) -> list[SubscriptionRequest]:
-    """
-    Get all subscription requests made by the current user.
-    Returns the user's subscription request history ordered by most recent first.
-    """
+@router.get("/subscription-requests", response_model=list[SubscriptionRequestOutput])
+def get_user_subscription_requests(user: CurrentUser, db: DbSession) -> list[SubscriptionRequestOutput]:
+    """Get all subscription requests for the authenticated user"""
     requests = db.scalars(
         select(SubscriptionRequest)
         .where(SubscriptionRequest.user_id == user.id)
         .order_by(SubscriptionRequest.requested_at.desc())
     ).all()
-    return list(requests)
 
-
-@router.post("/subscription/request", response_model=SubscriptionRequestOutput, status_code=status.HTTP_201_CREATED)
-def request_subscription_plan(payload: SubscriptionRequestInput, user: CurrentUser, db: DbSession) -> SubscriptionRequest:
-    """
-    Request a subscription plan.
-    Users can request any plan at any time. Current plan remains active until admin approves.
-    """
-    # Check if plan exists and is active
-    plan = db.get(SubscriptionPlan, payload.plan_id)
-    if plan is None or not plan.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription plan not found or inactive.")
-    
-    # Check if user already has a pending request for this plan
-    existing_pending = db.scalar(
-        select(SubscriptionRequest)
-        .where(
-            SubscriptionRequest.user_id == user.id,
-            SubscriptionRequest.plan_id == payload.plan_id,
-            SubscriptionRequest.status == SubscriptionRequestStatus.PENDING
+    return [
+        SubscriptionRequestOutput(
+            id=req.id,
+            user_id=req.user_id,
+            plan_id=req.plan_id,
+            billing_cycle=req.billing_cycle,
+            status=req.status,
+            payment_screenshot_url=req.payment_screenshot_url,
+            utr_number=req.utr_number,
+            requested_at=req.requested_at,
+            reviewed_at=req.reviewed_at,
+            rejection_reason=req.rejection_reason,
+            admin_notes=req.admin_notes,
         )
-    )
-    if existing_pending:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="You already have a pending request for this plan."
-        )
-    
-    # Check if this is already the user's current plan
-    if user.current_plan_id == payload.plan_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This is already your current active plan."
-        )
-    
-    # Create the subscription request
-    request = SubscriptionRequest(
-        user_id=user.id,
-        plan_id=payload.plan_id,
-        status=SubscriptionRequestStatus.PENDING
-    )
-    db.add(request)
-    db.commit()
-    db.refresh(request)
-    return request
-
-
-@router.delete("/subscription/request/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
-def cancel_subscription_request(request_id: UUID, user: CurrentUser, db: DbSession) -> None:
-    """
-    Cancel a pending subscription request.
-    Users can only cancel their own pending requests.
-    """
-    request = db.get(SubscriptionRequest, request_id)
-    
-    if request is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subscription request not found.")
-    
-    # Check if the request belongs to the current user
-    if request.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only cancel your own requests.")
-    
-    # Check if the request is still pending
-    if request.status != SubscriptionRequestStatus.PENDING:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Cannot cancel a request that has already been {request.status.value.lower()}."
-        )
-    
-    # Delete the request
-    db.delete(request)
-    db.commit()
+        for req in requests
+    ]
