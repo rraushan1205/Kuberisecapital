@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models.domain import AccountStatus, StrategyStatus, SubscriptionStatus, UserRole
+from app.models.domain import AccountStatus, BrokerStatus, StrategyStatus, SubscriptionStatus, UserRole
 
 
 class AdminLoginInput(BaseModel):
@@ -115,3 +115,24 @@ class UpdateUserSubscriptionInput(BaseModel):
     """Input for updating a user's subscription plan"""
     plan_id: UUID
     notes: str | None = Field(None, max_length=1000)
+
+
+class BrokerAccountOutput(BaseModel):
+    """Broker account connection information"""
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: UUID
+    user_id: UUID
+    provider: str
+    status: str
+    connected_at: datetime | None
+    token_expires_at: datetime | None
+    broker_user_id: str | None
+
+
+class BrokerAccountsListResponse(BaseModel):
+    """Paginated list of broker accounts"""
+    total: int
+    skip: int
+    limit: int
+    items: list[BrokerAccountOutput]

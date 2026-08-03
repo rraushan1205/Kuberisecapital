@@ -13,6 +13,8 @@ from app.middleware.rate_limit import get_limiter
 from app.models.domain import (
     AccountStatus,
     Announcement,
+    BrokerConnection,
+    BrokerStatus,
     ExecutionAction,
     ExecutionLog,
     Strategy,
@@ -31,6 +33,8 @@ from app.schemas.admin import (
     AdminSessionOutput,
     AnnouncementInput,
     AnnouncementOutput,
+    BrokerAccountOutput,
+    BrokerAccountsListResponse,
     DashboardStatsOutput,
     ExecutionLogOutput,
     StrategyOutput,
@@ -558,6 +562,119 @@ def approve_subscription_request(
         reviewed_at=request.reviewed_at,
         reviewed_by_id=request.reviewed_by_id,
         notes=request.notes,
+    )
+
+
+@router.get("/brokers/accounts", response_model=BrokerAccountsListResponse)
+def list_broker_accounts(
+    _: SuperAdmin,
+    db: DbSession,
+    skip: int = 0,
+    limit: int = 20,
+    provider: str | None = None,
+    broker_status: str | None = None,
+    user_id: UUID | None = None,
+) -> BrokerAccountsListResponse:
+    """
+    List all broker accounts across the system with pagination and filtering.
+    
+    Super admins can view all broker connections with optional filters for
+    provider, status, and user_id. Returns paginated results with connection
+    details but excludes sensitive token data.
+    
+    Args:
+        skip: Pagination offset (default: 0, must be >= 0)
+        limit: Results per page (default: 20, max: 100)
+        provider: Optional filter by broker provider (e.g., "fyers", "zerodha")
+        status: Optional filter by connection status (e.g., "connected", "disconnected")
+        user_id: Optional filter by user ID (UUID string)
+    
+    Returns:
+        BrokerAccountsListResponse: Paginated list with total count
+    
+    Raises:
+        HTTPException 400: If limit > 100 or skip < 0 or invalid filter values
+        HTTPException 403: If not super admin (handled by dependency)
+    """
+    # Validate pagination parameters
+    if skip < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="skip must be greater than or equal to 0."
+        )
+    
+    if limit < 1 or limit > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="limit must be between 1 and 100."
+        )
+    
+    # Build base query
+    query = select(BrokerConnection)
+    count_query = select(func.count()).select_from(BrokerConnection)
+    
+    # Apply filters
+    if user_id is not None:
+        query = query.where(BrokerConnection.user_id == user_id)
+        count_query = count_query.where(BrokerConnection.user_id == user_id)
+    
+    if provider is not None:
+        provider_stripped = provider.strip()
+        if not provider_stripped:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="provider filter cannot be empty."
+            )
+        query = query.where(BrokerConnection.provider == provider_stripped)
+        count_query = count_query.where(BrokerConnection.provider == provider_stripped)
+    
+    if broker_status is not None:
+        status_stripped = broker_status.strip()
+        if not status_stripped:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="status filter cannot be empty."
+            )
+        # Convert status string to enum (case-insensitive)
+        try:
+            status_enum = BrokerStatus[status_stripped.upper()]
+        except KeyError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status value. Must be one of: {', '.join([s.value.lower() for s in BrokerStatus])}."
+            )
+        query = query.where(BrokerConnection.status == status_enum)
+        count_query = count_query.where(BrokerConnection.status == status_enum)
+    
+    # Get total count with filters applied
+    total = db.scalar(count_query) or 0
+    
+    # Apply ordering and pagination
+    query = query.order_by(BrokerConnection.connected_at.desc())
+    query = query.offset(skip).limit(limit)
+    
+    # Execute query
+    connections = db.scalars(query).all()
+    
+    # Convert to response schema with lowercase status
+    items = [
+        BrokerAccountOutput(
+            id=conn.id,
+            user_id=conn.user_id,
+            provider=conn.provider,
+            status=conn.status.value.lower(),
+            connected_at=conn.connected_at,
+            token_expires_at=conn.token_expires_at,
+            broker_user_id=conn.broker_user_id,
+        )
+        for conn in connections
+    ]
+    
+    return BrokerAccountsListResponse(
+        total=total,
+        skip=skip,
+        limit=limit,
+        items=items,
     )
 
 

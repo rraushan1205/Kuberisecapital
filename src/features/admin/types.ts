@@ -85,3 +85,20 @@ export type UpdateUserSubscriptionInput = {
   plan_id: string;
   notes?: string;
 };
+
+export type BrokerAccount = {
+  id: string;
+  user_id: string;
+  provider: string;
+  status: "connected" | "disconnected";
+  connected_at: string | null;
+  token_expires_at: string | null;
+  broker_user_id: string | null;
+};
+
+export type BrokerAccountsResponse = {
+  total: number;
+  skip: number;
+  limit: number;
+  items: BrokerAccount[];
+};

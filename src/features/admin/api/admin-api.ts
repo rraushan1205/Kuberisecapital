@@ -1,4 +1,4 @@
-import type { AdminAnnouncement, AdminExecutionLog, AdminSession, AdminStrategy, AdminSubscriptionPlan, AdminUser, AdminUserDetail, SubscriptionPlanInput, UpdateUserSubscriptionInput } from "@/features/admin/types";
+import type { AdminAnnouncement, AdminExecutionLog, AdminSession, AdminStrategy, AdminSubscriptionPlan, AdminUser, AdminUserDetail, BrokerAccountsResponse, SubscriptionPlanInput, UpdateUserSubscriptionInput } from "@/features/admin/types";
 import { authHeader, clearSession, getRefreshToken, setSession } from "@/lib/session-storage";
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
@@ -105,4 +105,13 @@ export const adminApi = {
   deleteSubscriptionPlan: (planId: string) => request<void>(`/api/v1/admin/subscription-plans/${planId}`, { method: "DELETE" }),
   getUserDetail: (userId: string) => request<AdminUserDetail>(`/api/v1/admin/users/${userId}`),
   updateUserSubscription: (userId: string, input: UpdateUserSubscriptionInput) => request<AdminUserDetail>(`/api/v1/admin/users/${userId}/subscription`, { method: "PUT", body: JSON.stringify(input) }),
+  getBrokerAccounts: (skip = 0, limit = 20, provider?: string, status?: string, userId?: string) => {
+    const params = new URLSearchParams();
+    params.set("skip", skip.toString());
+    params.set("limit", limit.toString());
+    if (provider) params.set("provider", provider);
+    if (status) params.set("status", status);
+    if (userId) params.set("user_id", userId);
+    return request<BrokerAccountsResponse>(`/api/v1/admin/brokers/accounts?${params.toString()}`);
+  },
 };
