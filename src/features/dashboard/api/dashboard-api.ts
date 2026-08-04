@@ -85,8 +85,56 @@ export async function downloadStrategyFile(strategyId: string, filename: string)
 }
 
 /**
- * Generate broker connection URL for OAuth flow
+ * Initiate a broker OAuth connection with the authenticated user's token.
+ *
+ * The connect endpoint is protected, so it cannot be reached via a plain
+ * `<a href>` navigation (which cannot attach the Authorization header). Instead
+ * we fetch it with the token present, read the resulting 307 redirect Location,
+ * and hand control to the browser to complete the OAuth flow.
  */
-export function brokerConnectUrl(provider: string): string {
-  return `${apiBaseUrl}/api/v1/client/brokers/${provider}/connect`;
+export async function connectBroker(provider: string): Promise<string> {
+  const response = await fetch(
+    `${apiBaseUrl}/api/v1/client/brokers/${provider}/connect`,
+    {
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...authHeader(),
+      },
+    }
+  );
+
+  if (response.status === 401) {
+    try {
+      await refreshClientSession();
+      return connectBroker(provider);
+    } catch {
+      throw new DashboardApiError(
+        "Your session expired. Please log in again.",
+        401
+      );
+    }
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    console.error("Broker connect failed:", text);
+
+    throw new DashboardApiError(
+      "Failed to initiate broker connection.",
+      response.status
+    );
+  }
+
+  const data = await response.json();
+
+  console.log("OAuth Response:", data);
+
+  if (!data.redirect_url) {
+    throw new DashboardApiError(
+      "Backend did not return redirect_url."
+    );
+  }
+
+  return data.redirect_url;
 }

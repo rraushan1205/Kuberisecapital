@@ -18,9 +18,8 @@ Security:
 """
 
 from datetime import UTC, datetime
-
 from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 
 from app.api.dependencies import CurrentUser, DbSession
@@ -38,7 +37,7 @@ async def connect_broker(
     provider: str,
     user: CurrentUser,
     db: DbSession,
-) -> RedirectResponse:
+) -> JSONResponse:
     """
     Initiate broker OAuth connection flow.
     
@@ -89,7 +88,12 @@ async def connect_broker(
             redirect_uri=redirect_uri,
         )
 
-        return RedirectResponse(url=auth_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        return JSONResponse(
+    status_code=status.HTTP_200_OK,
+    content={
+        "redirect_url": auth_url
+    },
+)
 
     except BrokerError as error:
         raise HTTPException(

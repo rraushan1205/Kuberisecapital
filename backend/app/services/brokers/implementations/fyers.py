@@ -158,8 +158,16 @@ class FyersBroker(BrokerProvider):
             )
 
             # Generate auth URL (Fyers SDK includes the state we passed in above)
+            print("=" * 80)
+            print("APP ID:", settings.fyers_app_id)
+            print("SECRET:", settings.fyers_secret_id[:6] + "..." if settings.fyers_secret_id else None)
+            print("REDIRECT:", redirect_uri)
+            print("STATE:", state)
+
             auth_url = fyers.generate_authcode()
 
+            print("AUTH URL:", auth_url)
+            print("=" * 80)
             # Record that this state was legitimately issued by this server, so the
             # callback can verify it later instead of just checking its format.
             from app.services.oauth_state_store import store_oauth_state
