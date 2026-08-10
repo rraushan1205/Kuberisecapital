@@ -46,10 +46,16 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
 
     # Broker API Configuration
+    # Broker API Configuration
     # Fyers broker credentials (get from https://myapi.fyers.in/dashboard)
     fyers_app_id: str | None = None
     fyers_secret_id: str | None = None
     fyers_redirect_uri: str | None = None
+
+    # Alice Blue broker credentials (get from https://a3.aliceblueonline.com/)
+    aliceblue_app_code: str | None = None
+    aliceblue_api_secret: str | None = None
+    aliceblue_redirect_uri: str | None = None
 
     # Frontend base URL for post-OAuth redirects
     frontend_url: str = "http://localhost:3000"
@@ -118,19 +124,17 @@ class Settings(BaseSettings):
 
         return value
 
-    # Cookie secure validator temporarily disabled for development
-    # TODO: Re-enable for production deployment
-    # @field_validator("cookie_secure")
-    # @classmethod
-    # def validate_cookie_secure(cls, value: bool, info) -> bool:
-    #     """Force secure cookies in production environment."""
-    #     environment = info.data.get("environment", "production")
-    #     if environment.lower() == "production" and not value:
-    #         raise ValueError(
-    #             "CRITICAL SECURITY ERROR: COOKIE_SECURE must be True in production. "
-    #             "Cookies will be transmitted over insecure HTTP otherwise."
-    #         )
-    #     return value
+    @field_validator("cookie_secure")
+    @classmethod
+    def validate_cookie_secure(cls, value: bool, info) -> bool:
+        """Force secure cookies in production environment."""
+        environment = info.data.get("environment", "production")
+        if environment.lower() == "production" and not value:
+            raise ValueError(
+                "CRITICAL SECURITY ERROR: COOKIE_SECURE must be True in production. "
+                "Cookies will be transmitted over insecure HTTP otherwise."
+            )
+        return value
 
     @field_validator("cookie_samesite")
     @classmethod

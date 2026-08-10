@@ -91,3 +91,11 @@ scratch_*.py
 /PROJECT_CONTEXT.md
 /QUICKSTART_FOR_CONTRIBUTOR*.md
 /stratum-clean.zip
+
+# All markdown files except README.md
+*.md
+!README.md
+
+# All shell scripts
+*.sh
+backend/*.sh

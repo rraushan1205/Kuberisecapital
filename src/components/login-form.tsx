@@ -22,6 +22,7 @@ export function LoginForm() {
   const params = useSearchParams();
   const nextPath = params.get("next") || "/dashboard";
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [fyersLoading, setFyersLoading] = useState(false);
   const form = useForm<LoginValues>({ 
     resolver: zodResolver(loginSchema), 
     mode: "onBlur", 
@@ -57,6 +58,39 @@ export function LoginForm() {
     }
   }
 
+  async function handleFyersLogin() {
+    setLoginError(null);
+    setFyersLoading(true);
+
+    try {
+      // Use same API base URL pattern as rest of the app
+      const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
+      
+      // Call backend OAuth login endpoint
+      const response = await fetch(`${apiBaseUrl}/api/v1/client/auth/oauth/fyers/login`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to initiate Fyers login");
+      }
+
+      const data = await response.json();
+      
+      // Redirect to Fyers OAuth page
+      if (data.authorize_url) {
+        window.location.href = data.authorize_url;
+      } else {
+        throw new Error("No authorization URL received");
+      }
+    } catch (error) {
+      setFyersLoading(false);
+      const errorMessage = error instanceof Error ? error.message : "Unable to authenticate with Fyers.";
+      setLoginError(errorMessage);
+    }
+  }
+
   const { errors, isSubmitting } = form.formState;
   return (
     <>
@@ -82,6 +116,26 @@ export function LoginForm() {
           <SubmitLabel loading={isSubmitting}>Continue <ArrowRight size={16} /></SubmitLabel>
         </button>
       </form>
+      
+      <div className="mt-6 flex items-center gap-3">
+        <div className="h-px flex-1 bg-[var(--line)]"></div>
+        <span className="text-xs text-[var(--ink-muted)]">or</span>
+        <div className="h-px flex-1 bg-[var(--line)]"></div>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleFyersLogin}
+        disabled={isSubmitting || fyersLoading}
+        className="mt-6 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[var(--line)] bg-[var(--canvas)] text-[var(--ink)] hover:bg-[var(--canvas-contrast)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {fyersLoading ? (
+          <span className="text-sm">Redirecting to Fyers...</span>
+        ) : (
+          <span className="text-sm font-medium">Continue with Fyers</span>
+        )}
+      </button>
+
       <div className="mt-7 border-t border-[var(--line)] pt-5">
         <div className="flex items-start gap-2.5 text-[12px] leading-5 text-[var(--ink-muted)]"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-[var(--positive)]" /> <span>Access is restricted to approved members. New to Stratum? <Link href="/register" className="text-link">Request access</Link>.</span></div>
       </div>

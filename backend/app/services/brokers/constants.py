@@ -69,7 +69,6 @@ WEBSOCKET_MESSAGE_QUEUE_SIZE = 1000  # Max messages in queue before dropping
 SUPPORTED_BROKERS = [
     "zerodha",
     "fyers",
-    "groww",
     "dhan",
     "angelone",
     "upstox",

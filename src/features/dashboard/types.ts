@@ -42,3 +42,30 @@ export type StrategyFileView = {
   readonly: boolean;
   message: string;
 };
+
+// Admin-managed strategy types (user view)
+export type UserStrategyPermission = {
+  id: number;
+  strategy_def_id: number;
+  strategy_name: string;
+  strategy_description: string;
+  config: Record<string, any>;
+  is_active: boolean;
+  error_message: string | null;
+  assigned_at: string;
+  // Execution state
+  is_running?: boolean;
+  has_open_position?: boolean;
+  position_details?: {
+    symbol?: string;
+    qty?: number;
+    entry_price?: number;
+    current_pnl?: number;
+  } | null;
+};
+
+export type StrategyControlResponse = {
+  success: boolean;
+  message: string;
+  is_running: boolean;
+};

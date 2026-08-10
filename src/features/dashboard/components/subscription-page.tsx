@@ -63,10 +63,9 @@ export function SubscriptionPage() {
   async function fetchData() {
     try {
       setError(null);
-      const [plansRes, requestsRes, currentPlanRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/client/subscription/plans`, { credentials: "include", headers: { Accept: "application/json", ...authHeader() } }),
-        fetch(`${API_BASE_URL}/api/v1/client/subscription/my-requests`, { credentials: "include", headers: { Accept: "application/json", ...authHeader() } }),
-        fetch(`${API_BASE_URL}/api/v1/client/subscription/current-plan`, { credentials: "include", headers: { Accept: "application/json", ...authHeader() } }),
+      const [plansRes, requestsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/client/subscription-plans`, { credentials: "include", headers: { Accept: "application/json", ...authHeader() } }),
+        fetch(`${API_BASE_URL}/api/v1/client/subscription-requests`, { credentials: "include", headers: { Accept: "application/json", ...authHeader() } }),
       ]);
 
       if (!plansRes.ok) {
@@ -89,10 +88,6 @@ export function SubscriptionPage() {
         setRequests(requestsData);
       }
 
-      if (currentPlanRes.ok) {
-        const currentPlanData = await currentPlanRes.json();
-        setCurrentPlan(currentPlanData);
-      }
     } catch (error) {
       console.error("Failed to fetch subscription data:", error);
       setError("Failed to connect to backend server. Please ensure the backend is running.");

@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -55,6 +55,12 @@ class SubscriptionRequestStatus(str, enum.Enum):
     REJECTED = "REJECTED"
 
 
+class LoginMethod(str, enum.Enum):
+    """Method used for broker authentication"""
+    OAUTH = "OAUTH"
+    API_KEY = "API_KEY"
+
+
 class RefreshToken(Base):
     """
     Refresh tokens for session management with inactivity-based expiration.
@@ -100,11 +106,22 @@ class User(Base):
     current_plan_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("subscription_plans.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Broker authentication preferences
+    login_method: Mapped[LoginMethod | None] = mapped_column(Enum(LoginMethod, name="login_method"), nullable=True)
+    last_broker_used: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     current_plan: Mapped["SubscriptionPlan | None"] = relationship(foreign_keys=[current_plan_id])
     subscription_requests: Mapped[list["SubscriptionRequest"]] = relationship(back_populates="user", foreign_keys="[SubscriptionRequest.user_id]", cascade="all, delete-orphan")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     broker_connections: Mapped[list["BrokerConnection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    broker_api_keys: Mapped[list["BrokerApiKey"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    strategy_permission: Mapped["UserStrategyPermission | None"] = relationship(back_populates="user", uselist=False)
+    strategy_assignments: Mapped[list["UserStrategyAssignment"]] = relationship(
+        back_populates="user", 
+        foreign_keys="[UserStrategyAssignment.user_id]",
+        cascade="all, delete-orphan"
+    )
 
 
 class BrokerConnection(Base):
@@ -123,6 +140,25 @@ class BrokerConnection(Base):
     broker_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="broker_connections")
+
+
+class BrokerApiKey(Base):
+    """
+    Stores encrypted API credentials for brokers that support API key authentication.
+    Alternative to OAuth for brokers like Fyers, Zerodha, etc.
+    """
+    __tablename__ = "broker_api_keys"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_broker_api_key_user_provider"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    api_key_encrypted: Mapped[str] = mapped_column(Text)
+    api_secret_encrypted: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user: Mapped[User] = relationship(back_populates="broker_api_keys")
 
 
 class Strategy(Base):
@@ -186,3 +222,99 @@ class SubscriptionRequest(Base):
     user: Mapped[User] = relationship(back_populates="subscription_requests", foreign_keys=[user_id])
     plan: Mapped[SubscriptionPlan] = relationship()
     reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id])
+
+
+class StrategyState(Base):
+    """Tracks real-time state of strategy execution for each user"""
+    __tablename__ = "strategy_state"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    strategy_id: Mapped[int] = mapped_column()
+    broker: Mapped[str] = mapped_column(String(50))
+    
+    # Signal tracking
+    last_signal_candle: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_signal_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    
+    # Position tracking
+    has_open_position: Mapped[bool] = mapped_column(Boolean, default=False)
+    position_symbol: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    position_side: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    position_qty: Mapped[int | None] = mapped_column(nullable=True)
+    position_entry_price: Mapped[float | None] = mapped_column(nullable=True)
+    position_entry_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    entry_order_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    
+    # TP/SL tracking
+    tp_order_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sl_order_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    target_price: Mapped[float | None] = mapped_column(nullable=True)
+    stoploss_price: Mapped[float | None] = mapped_column(nullable=True)
+    
+    # Metadata
+    status: Mapped[str] = mapped_column(String(20), default="idle")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cancel_attempt_count: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('user_id', 'strategy_id', name='uq_user_strategy'),
+    )
+
+
+class StrategyDefinition(Base):
+    """Admin-uploaded strategy definitions"""
+    __tablename__ = "strategy_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    config_schema: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+
+    # Relationships
+    assignments: Mapped[list["UserStrategyAssignment"]] = relationship(back_populates="strategy_definition", cascade="all, delete-orphan")
+
+
+class UserStrategyPermission(Base):
+    """User permission for admin to trade on their behalf"""
+    __tablename__ = "user_strategy_permissions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    allow_admin_trading: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    max_daily_loss: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    max_position_size: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="strategy_permission")
+
+
+class UserStrategyAssignment(Base):
+    """Admin assigns strategies to users"""
+    __tablename__ = "user_strategy_assignments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    strategy_def_id: Mapped[int] = mapped_column(ForeignKey("strategy_definitions.id", ondelete="CASCADE"), nullable=False)
+    config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    stopped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="strategy_assignments", foreign_keys=[user_id])
+    strategy_definition: Mapped["StrategyDefinition"] = relationship(back_populates="assignments")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'strategy_def_id', name='uq_user_strategy_assignment'),
+    )

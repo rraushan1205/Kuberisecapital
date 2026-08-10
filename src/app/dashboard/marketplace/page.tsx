@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { MarketplacePage } from "@/features/dashboard/components/marketplace-page";
+import { MyStrategiesPage } from "@/features/dashboard/components/my-strategies-page";
 
-export const metadata: Metadata = { title: "Marketplace" };
+export const metadata: Metadata = { title: "My Strategies" };
 
 export default function MarketplaceRoute() {
-  return <MarketplacePage />;
+  return <MyStrategiesPage />;
 }

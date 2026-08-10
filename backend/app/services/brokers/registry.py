@@ -17,6 +17,8 @@ to broker classes. Route handlers and services use the registry indirectly
 through the BrokerManager.
 """
 
+from __future__ import annotations
+
 from typing import Type
 
 from app.services.brokers.base import BrokerProvider
@@ -181,7 +183,7 @@ class BrokerRegistry:
         
         Example:
             providers = registry.list_providers()
-            # Returns: ["zerodha", "fyers", "groww"]
+            # Returns: ["fyers", "aliceblue"]
         """
         return list(self._brokers.keys())
 

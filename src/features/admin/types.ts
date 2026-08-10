@@ -11,12 +11,63 @@ export type AdminUser = {
   created_at: string;
 };
 
+// Legacy strategy type (deprecated - kept for backward compatibility)
 export type AdminStrategy = {
   id: string;
   name: string;
   script_filename: string;
   status: "STOPPED" | "RUNNING";
   created_at: string;
+};
+
+// New admin-managed strategy system types
+export type StrategyDefinition = {
+  id: number;
+  name: string;
+  description: string;
+  code: string;
+  created_by_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StrategyDefinitionCreate = {
+  name: string;
+  description: string;
+  code: string;
+};
+
+export type StrategyDefinitionUpdate = {
+  name?: string;
+  description?: string;
+  code?: string;
+};
+
+export type UserStrategyAssignment = {
+  id: number;
+  user_id: string;
+  strategy_def_id: number;
+  config: Record<string, any>;
+  is_active: boolean;
+  error_message: string | null;
+  assigned_by_id: string;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  user_email?: string;
+  strategy_name?: string;
+  strategy_description?: string;
+};
+
+export type UserStrategyAssignmentCreate = {
+  user_id: string;
+  strategy_def_id: number;
+  config?: Record<string, any>;
+};
+
+export type UserStrategyAssignmentUpdate = {
+  config?: Record<string, any>;
+  is_active?: boolean;
 };
 
 export type AdminExecutionLog = {

@@ -104,3 +104,8 @@ def require_current_user(
 
 
 CurrentUser = Annotated[User, Depends(require_current_user)]
+
+
+# Convenience aliases for clarity in different contexts
+get_admin_user = require_super_admin
+get_current_user = require_current_user

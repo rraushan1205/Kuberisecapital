@@ -8,7 +8,9 @@ from app.db.base import Base
 from app.models import domain  # noqa: F401
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# Escape % characters for configparser
+database_url = get_settings().database_url.replace('%', '%%')
+config.set_main_option("sqlalchemy.url", database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -25,7 +27,14 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     connectable = engine_from_config(config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool)
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            include_object=lambda obj, name, type_, reflected, compare_to: not (
+                type_ == "type" and hasattr(obj, "name") and obj.name in ["subscription_plan_tier", "subscription_request_status"]
+            ) if type_ == "type" else True
+        )
         with context.begin_transaction():
             context.run_migrations()
 

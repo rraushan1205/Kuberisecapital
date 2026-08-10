@@ -38,37 +38,33 @@ def upgrade() -> None:
     """)
     
     # Create subscription_plans table
-    op.create_table(
-        'subscription_plans',
-        sa.Column('id', sa.UUID(), nullable=False),
-        sa.Column('tier', sa.Enum('BASIC', 'PLUS', 'PRO', 'ELITE', 'MAX', name='subscription_plan_tier', create_type=False), nullable=False),
-        sa.Column('capital', sa.Integer(), nullable=False),
-        sa.Column('nifty_lots', sa.Integer(), nullable=False),
-        sa.Column('sensex_lots', sa.Integer(), nullable=False),
-        sa.Column('bank_nifty_lots', sa.Integer(), nullable=False),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('tier')
-    )
+    op.execute("""
+        CREATE TABLE subscription_plans (
+            id UUID PRIMARY KEY,
+            tier subscription_plan_tier NOT NULL UNIQUE,
+            capital INTEGER NOT NULL,
+            nifty_lots INTEGER NOT NULL,
+            sensex_lots INTEGER NOT NULL,
+            bank_nifty_lots INTEGER NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT true,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
     op.create_index(op.f('ix_subscription_plans_tier'), 'subscription_plans', ['tier'], unique=False)
     
     # Create subscription_requests table
-    op.create_table(
-        'subscription_requests',
-        sa.Column('id', sa.UUID(), nullable=False),
-        sa.Column('user_id', sa.UUID(), nullable=False),
-        sa.Column('plan_id', sa.UUID(), nullable=False),
-        sa.Column('status', sa.Enum('PENDING', 'APPROVED', 'REJECTED', name='subscription_request_status', create_type=False), nullable=False, server_default='PENDING'),
-        sa.Column('requested_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('reviewed_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('reviewed_by_id', sa.UUID(), nullable=True),
-        sa.Column('notes', sa.Text(), nullable=True),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['plan_id'], ['subscription_plans.id'], ondelete='RESTRICT'),
-        sa.ForeignKeyConstraint(['reviewed_by_id'], ['users.id'], ondelete='SET NULL'),
-        sa.PrimaryKeyConstraint('id')
-    )
+    op.execute("""
+        CREATE TABLE subscription_requests (
+            id UUID PRIMARY KEY,
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            plan_id UUID NOT NULL REFERENCES subscription_plans(id) ON DELETE RESTRICT,
+            status subscription_request_status NOT NULL DEFAULT 'PENDING',
+            requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            reviewed_at TIMESTAMPTZ,
+            reviewed_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
+            notes TEXT
+        )
+    """)
     op.create_index(op.f('ix_subscription_requests_user_id'), 'subscription_requests', ['user_id'], unique=False)
     op.create_index(op.f('ix_subscription_requests_status'), 'subscription_requests', ['status'], unique=False)
     op.create_index(op.f('ix_subscription_requests_requested_at'), 'subscription_requests', ['requested_at'], unique=False)

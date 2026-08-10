@@ -1,4 +1,4 @@
-import type { AdminAnnouncement, AdminExecutionLog, AdminSession, AdminStrategy, AdminSubscriptionPlan, AdminUser, AdminUserDetail, BrokerAccountsResponse, SubscriptionPlanInput, UpdateUserSubscriptionInput } from "@/features/admin/types";
+import type { AdminAnnouncement, AdminExecutionLog, AdminSession, AdminStrategy, AdminSubscriptionPlan, AdminUser, AdminUserDetail, BrokerAccountsResponse, SubscriptionPlanInput, UpdateUserSubscriptionInput, StrategyDefinition, StrategyDefinitionCreate, StrategyDefinitionUpdate, UserStrategyAssignment, UserStrategyAssignmentCreate, UserStrategyAssignmentUpdate } from "@/features/admin/types";
 import { authHeader, clearSession, getRefreshToken, setSession } from "@/lib/session-storage";
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
@@ -114,4 +114,16 @@ export const adminApi = {
     if (userId) params.set("user_id", userId);
     return request<BrokerAccountsResponse>(`/api/v1/admin/brokers/accounts?${params.toString()}`);
   },
+  
+  // Admin-managed strategy system endpoints
+  getStrategyDefinitions: () => request<StrategyDefinition[]>("/api/v1/admin/strategies/definitions"),
+  getStrategyDefinition: (id: number) => request<StrategyDefinition>(`/api/v1/admin/strategies/definitions/${id}`),
+  createStrategyDefinition: (data: StrategyDefinitionCreate) => request<StrategyDefinition>("/api/v1/admin/strategies/definitions", { method: "POST", body: JSON.stringify(data) }),
+  updateStrategyDefinition: (id: number, data: StrategyDefinitionUpdate) => request<StrategyDefinition>(`/api/v1/admin/strategies/definitions/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteStrategyDefinition: (id: number) => request<void>(`/api/v1/admin/strategies/definitions/${id}`, { method: "DELETE" }),
+  
+  getUserStrategyAssignments: () => request<UserStrategyAssignment[]>("/api/v1/admin/strategies/assignments"),
+  createUserStrategyAssignment: (data: UserStrategyAssignmentCreate) => request<UserStrategyAssignment>("/api/v1/admin/strategies/assignments", { method: "POST", body: JSON.stringify(data) }),
+  updateUserStrategyAssignment: (id: number, data: UserStrategyAssignmentUpdate) => request<UserStrategyAssignment>(`/api/v1/admin/strategies/assignments/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteUserStrategyAssignment: (id: number) => request<void>(`/api/v1/admin/strategies/assignments/${id}`, { method: "DELETE" }),
 };

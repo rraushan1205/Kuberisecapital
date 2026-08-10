@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { StrategiesPage } from "@/features/admin/components/strategies-page";
+import { StrategyManagementPage } from "@/features/admin/components/strategy-management-page";
 
-export const metadata: Metadata = { title: "Strategies" };
+export const metadata: Metadata = { title: "Strategy Management" };
 
 export default function StrategiesRoute() {
-  return <StrategiesPage />;
+  return <StrategyManagementPage />;
 }

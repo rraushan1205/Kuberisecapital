@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.api.dependencies import CurrentUser, DbSession
 from app.core.config import get_settings
 from app.models.domain import (
+    BrokerApiKey,
     BrokerConnection,
     BrokerStatus,
     Strategy,
@@ -18,6 +19,7 @@ from app.models.domain import (
     SubscriptionRequestStatus,
     SubscriptionStatus,
 )
+from app.schemas.client import EnhancedProfileOutput
 from app.schemas.subscription import (
     SubscriptionPlanOutput,
     SubscriptionRequestInput,
@@ -202,25 +204,8 @@ def download_strategy_file(strategy_id: UUID, _: CurrentUser, db: DbSession) -> 
 def get_subscription_plans(_: CurrentUser, db: DbSession) -> list[SubscriptionPlanOutput]:
     """Get all available subscription plans"""
     plans = db.scalars(select(SubscriptionPlan).where(SubscriptionPlan.is_active == True)).all()
-    return [
-        SubscriptionPlanOutput(
-            id=plan.id,
-            tier=plan.tier,
-            name=plan.name,
-            nifty_lots=plan.nifty_lots,
-            bank_nifty_lots=plan.bank_nifty_lots,
-            fin_nifty_lots=plan.fin_nifty_lots,
-            mid_cap_nifty_lots=plan.mid_cap_nifty_lots,
-            sensex_lots=plan.sensex_lots,
-            bank_ex_lots=plan.bank_ex_lots,
-            monthly_price=plan.monthly_price,
-            quarterly_price=plan.quarterly_price,
-            yearly_price=plan.yearly_price,
-            is_active=plan.is_active,
-            created_at=plan.created_at,
-        )
-        for plan in plans
-    ]
+    # Schema has from_attributes=True, so return models directly
+    return list(plans)
 
 
 @router.post("/subscription-requests", response_model=SubscriptionRequestOutput)
@@ -262,10 +247,7 @@ def create_subscription_request(
     new_request = SubscriptionRequest(
         user_id=user.id,
         plan_id=data.plan_id,
-        billing_cycle=data.billing_cycle,
         status=SubscriptionRequestStatus.PENDING,
-        payment_screenshot_url=data.payment_screenshot_url,
-        utr_number=data.utr_number,
         requested_at=datetime.now(UTC),
     )
 
@@ -273,19 +255,8 @@ def create_subscription_request(
     db.commit()
     db.refresh(new_request)
 
-    return SubscriptionRequestOutput(
-        id=new_request.id,
-        user_id=new_request.user_id,
-        plan_id=new_request.plan_id,
-        billing_cycle=new_request.billing_cycle,
-        status=new_request.status,
-        payment_screenshot_url=new_request.payment_screenshot_url,
-        utr_number=new_request.utr_number,
-        requested_at=new_request.requested_at,
-        reviewed_at=new_request.reviewed_at,
-        rejection_reason=new_request.rejection_reason,
-        admin_notes=new_request.admin_notes,
-    )
+    # Schema has from_attributes=True, so return model directly
+    return new_request
 
 
 @router.get("/subscription-requests", response_model=list[SubscriptionRequestOutput])
@@ -297,19 +268,72 @@ def get_user_subscription_requests(user: CurrentUser, db: DbSession) -> list[Sub
         .order_by(SubscriptionRequest.requested_at.desc())
     ).all()
 
-    return [
-        SubscriptionRequestOutput(
-            id=req.id,
-            user_id=req.user_id,
-            plan_id=req.plan_id,
-            billing_cycle=req.billing_cycle,
-            status=req.status,
-            payment_screenshot_url=req.payment_screenshot_url,
-            utr_number=req.utr_number,
-            requested_at=req.requested_at,
-            reviewed_at=req.reviewed_at,
-            rejection_reason=req.rejection_reason,
-            admin_notes=req.admin_notes,
-        )
-        for req in requests
-    ]
+    # Schema has from_attributes=True, so return models directly
+    return list(requests)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Enhanced User Profile
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/profile/enhanced", response_model=EnhancedProfileOutput)
+def get_enhanced_profile(user: CurrentUser, db: DbSession) -> EnhancedProfileOutput:
+    """
+    Get enhanced user profile with broker authentication summary.
+    
+    Returns comprehensive profile information including:
+    - Basic user details (email, name, status)
+    - Connected OAuth brokers
+    - Stored API keys (count and providers)
+    - Last broker used
+    - Login method preference
+    
+    Args:
+        user: Authenticated user from JWT token
+        db: Database session
+    
+    Returns:
+        EnhancedProfileOutput: Enhanced profile with broker summary
+    
+    Example:
+        GET /api/v1/client/profile/enhanced
+        -> Returns: {
+            "user_id": "uuid",
+            "email": "user@example.com",
+            "full_name": "John Doe",
+            "account_status": "APPROVED",
+            "subscription_status": "ACTIVE",
+            "connected_brokers": ["fyers"],
+            "stored_api_keys": ["zerodha"],
+            "last_broker_used": "fyers",
+            "login_method": "OAUTH",
+            "created_at": "2026-01-15T10:30:00Z",
+            "last_login_at": "2026-08-03T08:00:00Z"
+        }
+    """
+    # Get connected OAuth brokers
+    stmt = select(BrokerConnection).where(
+        BrokerConnection.user_id == user.id,
+        BrokerConnection.status == BrokerStatus.CONNECTED,
+    )
+    connections = db.execute(stmt).scalars().all()
+    connected_brokers = [conn.provider for conn in connections]
+    
+    # Get stored API keys
+    stmt = select(BrokerApiKey).where(BrokerApiKey.user_id == user.id)
+    api_keys = db.execute(stmt).scalars().all()
+    stored_api_keys = [key.provider for key in api_keys]
+    
+    return EnhancedProfileOutput(
+        user_id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        account_status=user.account_status.value,
+        subscription_status=user.subscription_status.value,
+        connected_brokers=connected_brokers,
+        stored_api_keys=stored_api_keys,
+        last_broker_used=user.last_broker_used,
+        login_method=user.login_method.value if user.login_method else None,
+        created_at=user.created_at,
+        last_login_at=user.last_login_at,
+    )

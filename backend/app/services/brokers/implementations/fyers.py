@@ -9,7 +9,7 @@ are not part of the initial authentication-only implementation phase.
 """
 
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fyers_apiv3 import fyersModel
@@ -293,7 +293,7 @@ class FyersBroker(BrokerProvider):
             broker_user_id = None
 
             # Fyers tokens are valid for 24 hours
-            expires_at = datetime.now(UTC) + timedelta(hours=24)
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
             return {
                 "access_token": access_token,

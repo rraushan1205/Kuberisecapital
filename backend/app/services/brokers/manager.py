@@ -16,6 +16,8 @@ Route handlers should use get_broker_manager() to obtain the manager
 and then call get_broker(provider_name) to get a broker instance.
 """
 
+from __future__ import annotations
+
 from functools import lru_cache
 
 from app.services.brokers.base import BrokerProvider
@@ -127,7 +129,7 @@ class BrokerManager:
         Example:
             manager = BrokerManager()
             providers = manager.list_supported_providers()
-            # Returns: ["zerodha", "fyers", "groww", "dhan", "angelone"]
+            # Returns: ["fyers", "aliceblue"]
         """
         return self._registry.list_providers()
 

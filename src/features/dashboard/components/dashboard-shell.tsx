@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { BarChart3, ChevronDown, CircleHelp, CreditCard, LayoutDashboard, LogOut, Menu, Settings2, Store } from "lucide-react";
+import { BarChart3, Building2, ChevronDown, CircleHelp, CreditCard, LayoutDashboard, LogOut, Menu, Settings2, Store } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/marketplace", label: "Marketplace", icon: Store, note: "Strategies" },
+  { href: "/dashboard/broker", label: "Broker", icon: Building2 },
   { href: "/dashboard/subscription", label: "Subscription", icon: CreditCard, note: "Plans" },
   { href: "/dashboard/support", label: "Support", icon: CircleHelp },
   { href: "/dashboard/settings", label: "Settings", icon: Settings2 },

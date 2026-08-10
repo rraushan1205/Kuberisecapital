@@ -29,6 +29,8 @@ Design rationale:
     - Enables centralized error logging and monitoring
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 

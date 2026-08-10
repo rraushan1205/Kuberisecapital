@@ -4,10 +4,10 @@ import { AppProviders } from "@/providers/app-providers";
 
 export const metadata: Metadata = {
   title: {
-    default: "Stratum | Secure access",
-    template: "%s | Stratum",
+    default: "Kuberise Capital | Secure access",
+    template: "%s | Kuberise Capital",
   },
-  description: "Secure access to the Stratum trading platform.",
+  description: "Secure access to the Kuberise Capital trading platform.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
