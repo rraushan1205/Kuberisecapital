@@ -38,7 +38,7 @@ export async function refreshClientSession(): Promise<AccountStatus> {
   return refreshInFlight;
 }
 
-export async function login(email: string, password: string): Promise<AccountStatus> {
+export async function login(email: string, password: string): Promise<{ status?: AccountStatus; requires2FA?: boolean; temp2faToken?: string }> {
   const response = await fetch(`${apiBaseUrl}/api/v1/client/auth/login`, {
     method: "POST",
     credentials: "include",
@@ -58,7 +58,29 @@ export async function login(email: string, password: string): Promise<AccountSta
   }
 
   const data = await response.json() as ClientSessionPayload;
-  setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+  if (data.requires_2fa && data.temp_2fa_token) {
+    return { requires2FA: true, temp2faToken: data.temp_2fa_token };
+  }
+
+  setSession({ access_token: data.access_token!, refresh_token: data.refresh_token! });
+  return { status: data.account_status as AccountStatus };
+}
+
+export async function verify2FALogin(temp2faToken: string, totpCode: string): Promise<AccountStatus> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/client/auth/verify-2fa`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ temp_2fa_token: temp2faToken, totp_code: totpCode }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { detail?: string } | null;
+    throw new Error(payload?.detail || "Invalid Google Authenticator code.");
+  }
+
+  const data = await response.json() as ClientSessionPayload;
+  setSession({ access_token: data.access_token!, refresh_token: data.refresh_token! });
   return data.account_status as AccountStatus;
 }
 

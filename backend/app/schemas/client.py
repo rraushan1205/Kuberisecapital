@@ -13,11 +13,20 @@ class ClientRefreshInput(BaseModel):
 
 
 class ClientSessionOutput(BaseModel):
-    user_id: UUID
-    email: EmailStr
-    account_status: str
-    access_token: str
-    refresh_token: str
+    user_id: UUID | None = None
+    email: EmailStr | None = None
+    account_status: str | None = None
+    access_token: str | None = None
+    refresh_token: str | None = None
+    requires_2fa: bool = False
+    temp_2fa_token: str | None = None
+
+class Verify2FAInput(BaseModel):
+    temp_2fa_token: str
+    totp_code: str = Field(min_length=6, max_length=6)
+
+class Enable2FAInput(BaseModel):
+    totp_code: str = Field(min_length=6, max_length=6)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

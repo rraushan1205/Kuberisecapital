@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowRight, ShieldCheck, KeyRound, Lock, Sparkles } from "lucide-react";
 import { AuthHeading, FieldBlock, PasswordField, SubmitLabel } from "@/components/auth-primitives";
-import { login, refreshClientSession } from "@/lib/auth-client";
+import { login, verify2FALogin, refreshClientSession } from "@/lib/auth-client";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
@@ -23,9 +23,16 @@ export function LoginForm() {
   const nextPath = params.get("next") || "/dashboard";
   const [loginError, setLoginError] = useState<string | null>(null);
   const [fyersLoading, setFyersLoading] = useState(false);
-  const form = useForm<LoginValues>({ 
-    resolver: zodResolver(loginSchema), 
-    mode: "onBlur", 
+
+  // 2FA state
+  const [step2FA, setStep2FA] = useState(false);
+  const [temp2faToken, setTemp2faToken] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState("");
+  const [totpSubmitting, setTotpSubmitting] = useState(false);
+
+  const form = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    mode: "onBlur",
     defaultValues: { email: "", password: "" }
   });
 
@@ -39,14 +46,20 @@ export function LoginForm() {
 
   async function onSubmit(values: LoginValues) {
     setLoginError(null);
-    
+
     try {
-      const status = await login(values.email, values.password);
-      if (status === "PENDING") {
+      const res = await login(values.email, values.password);
+      if (res.requires2FA && res.temp2faToken) {
+        setTemp2faToken(res.temp2faToken);
+        setStep2FA(true);
+        return;
+      }
+
+      if (res.status === "PENDING") {
         router.replace(`/pending-approval?email=${encodeURIComponent(values.email)}`);
         return;
       }
-      if (status === "REJECTED") {
+      if (res.status === "REJECTED") {
         router.replace(`/account-rejected?email=${encodeURIComponent(values.email)}`);
         return;
       }
@@ -58,15 +71,40 @@ export function LoginForm() {
     }
   }
 
+  async function handleVerify2FA(e: React.FormEvent) {
+    e.preventDefault();
+    if (!temp2faToken || totpCode.trim().length !== 6) {
+      setLoginError("Please enter a valid 6-digit Google Authenticator code.");
+      return;
+    }
+
+    setLoginError(null);
+    setTotpSubmitting(true);
+
+    try {
+      const status = await verify2FALogin(temp2faToken, totpCode.trim());
+      if (status === "PENDING") {
+        router.replace(`/pending-approval`);
+        return;
+      }
+      if (status === "REJECTED") {
+        router.replace(`/account-rejected`);
+        return;
+      }
+      router.push(nextPath);
+    } catch (error) {
+      setTotpSubmitting(false);
+      const errorMessage = error instanceof Error ? error.message : "Invalid code.";
+      setLoginError(errorMessage);
+    }
+  }
+
   async function handleFyersLogin() {
     setLoginError(null);
     setFyersLoading(true);
 
     try {
-      // Use same API base URL pattern as rest of the app
       const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
-      
-      // Call backend OAuth login endpoint
       const response = await fetch(`${apiBaseUrl}/api/v1/client/auth/oauth/fyers/login`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
@@ -77,8 +115,6 @@ export function LoginForm() {
       }
 
       const data = await response.json();
-      
-      // Redirect to Fyers OAuth page
       if (data.authorize_url) {
         window.location.href = data.authorize_url;
       } else {
@@ -92,53 +128,147 @@ export function LoginForm() {
   }
 
   const { errors, isSubmitting } = form.formState;
+
   return (
-    <>
-      <AuthHeading eyebrow="MEMBER SIGN IN" title="Welcome back.">
-        Sign in to continue to your execution workspace.
-      </AuthHeading>
-      {loginError && (
-        <div className="rounded-lg border border-[var(--danger)] bg-[var(--danger)]/5 px-4 py-3 text-sm text-[var(--danger)]">
-          {loginError}
+    <div className="mx-auto w-full max-w-[420px] rounded-2xl border border-slate-200/80 bg-white p-8 shadow-xl shadow-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+      {step2FA ? (
+        <div>
+          <div className="mb-6 flex flex-col items-center text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+              <KeyRound className="h-6 w-6" />
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Two-Factor Authentication
+            </h2>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Enter the 6-digit verification code from your Google Authenticator app.
+            </p>
+          </div>
+
+          {loginError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+              {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleVerify2FA} className="space-y-5">
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                Authenticator Code
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                placeholder="000000"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-2xl font-mono tracking-widest text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400"
+                autoFocus
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={totpSubmitting || totpCode.length !== 6}
+              className="w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white transition-all hover:bg-blue-700 disabled:opacity-50"
+            >
+              {totpSubmitting ? "Verifying..." : "Verify & Continue"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setStep2FA(false); setLoginError(null); }}
+              className="w-full text-center text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              ← Back to Sign In
+            </button>
+          </form>
         </div>
+      ) : (
+        <>
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Welcome back
+            </h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Sign in to your Kuberise workspace
+            </p>
+          </div>
+
+          {loginError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+              {loginError}
+            </div>
+          )}
+
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
+            <div>
+              <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="name@example.com"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                {...form.register("email")}
+              />
+              {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label htmlFor="password" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Password
+                </label>
+                <Link href="/forgot-password" className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                  Forgot?
+                </Link>
+              </div>
+              <PasswordField
+                id="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                error={!!errors.password}
+                {...form.register("password")}
+              />
+              {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+            >
+              {isSubmitting ? "Signing in..." : "Continue"}
+              <ArrowRight size={16} />
+            </button>
+          </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+            </div>
+            <div className="relative flex justify-center text-xs tracking-wider uppercase">
+              <span className="bg-white px-2 text-slate-400 dark:bg-slate-900">or continue with</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleFyersLogin}
+            disabled={fyersLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
+          >
+            <ShieldCheck className="h-4 w-4 text-blue-600" />
+            {fyersLoading ? "Initiating Fyers Login..." : "Sign in with Fyers Broker"}
+          </button>
+        </>
       )}
-      <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-5">
-        <FieldBlock label="Email address" htmlFor="email" error={errors.email?.message}>
-          <input id="email" autoComplete="email" inputMode="email" placeholder="you@firm.com" className="auth-input" aria-invalid={!!errors.email} {...form.register("email")} />
-        </FieldBlock>
-        <FieldBlock label="Password" htmlFor="password" error={errors.password?.message}>
-          <PasswordField id="password" autoComplete="current-password" placeholder="Enter your password" error={!!errors.password} {...form.register("password")} />
-        </FieldBlock>
-        <div className="flex items-center justify-end pt-0.5">
-          <Link href="/forgot-password" className="text-link text-[13px]">Forgot password?</Link>
-        </div>
-        <button type="submit" className="primary-button mt-1" disabled={isSubmitting}>
-          <SubmitLabel loading={isSubmitting}>Continue <ArrowRight size={16} /></SubmitLabel>
-        </button>
-      </form>
-      
-      <div className="mt-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-[var(--line)]"></div>
-        <span className="text-xs text-[var(--ink-muted)]">or</span>
-        <div className="h-px flex-1 bg-[var(--line)]"></div>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleFyersLogin}
-        disabled={isSubmitting || fyersLoading}
-        className="mt-6 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[var(--line)] bg-[var(--canvas)] text-[var(--ink)] hover:bg-[var(--canvas-contrast)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {fyersLoading ? (
-          <span className="text-sm">Redirecting to Fyers...</span>
-        ) : (
-          <span className="text-sm font-medium">Continue with Fyers</span>
-        )}
-      </button>
-
-      <div className="mt-7 border-t border-[var(--line)] pt-5">
-        <div className="flex items-start gap-2.5 text-[12px] leading-5 text-[var(--ink-muted)]"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-[var(--positive)]" /> <span>Access is restricted to approved members. New to Stratum? <Link href="/register" className="text-link">Request access</Link>.</span></div>
-      </div>
-    </>
+    </div>
   );
 }
