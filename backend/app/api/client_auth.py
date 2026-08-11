@@ -1,14 +1,26 @@
+import base64
+import io
 from datetime import UTC, datetime
 
+import jwt
+import pyotp
+import qrcode
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
-from app.api.dependencies import DbSession
+from app.api.dependencies import CurrentUser, DbSession
+from app.core.config import get_settings
 from app.core.logging import log_auth_event
 from app.core.security import create_access_token, verify_password
 from app.middleware.rate_limit import get_limiter
 from app.models.domain import AccountStatus, User, UserRole
-from app.schemas.client import ClientLoginInput, ClientRefreshInput, ClientSessionOutput
+from app.schemas.client import (
+    ClientLoginInput,
+    ClientRefreshInput,
+    ClientSessionOutput,
+    Enable2FAInput,
+    Verify2FAInput,
+)
 from app.services.refresh_sessions import (
     create_refresh_session,
     revoke_refresh_session,
@@ -81,7 +93,7 @@ def login_client(payload: ClientLoginInput, request: Request, db: DbSession) -> 
             "type": "2fa_challenge",
             "exp": datetime.now(UTC).timestamp() + 300  # 5 mins
         }
-        temp_2fa_token = encode(temp_payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+        temp_2fa_token = jwt.encode(temp_payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
         return ClientSessionOutput(
             requires_2fa=True,
             temp_2fa_token=temp_2fa_token
@@ -112,7 +124,7 @@ def login_client(payload: ClientLoginInput, request: Request, db: DbSession) -> 
 def verify_2fa_login(payload: Verify2FAInput, request: Request, db: DbSession) -> ClientSessionOutput:
     settings = get_settings()
     try:
-        decoded = decode(payload.temp_2fa_token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        decoded = jwt.decode(payload.temp_2fa_token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
         if decoded.get("type") != "2fa_challenge":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token type.")
         user_id = decoded.get("sub")

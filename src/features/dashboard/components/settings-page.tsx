@@ -15,7 +15,7 @@ export function SettingsPage() {
   // 2FA state
   const [totpSetup, setTotpSetup] = useState<{ secret: string; qr_code: string; enabled: boolean } | null>(null);
   const [totpCode, setTotpCode] = useState("");
-  const [2faMessage, set2faMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [twoFaMessage, setTwoFaMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
@@ -41,11 +41,11 @@ export function SettingsPage() {
 
   async function handleToggle2FA(enable: boolean) {
     if (totpCode.trim().length !== 6) {
-      set2faMessage({ type: "error", text: "Please enter a valid 6-digit code from Google Authenticator." });
+      setTwoFaMessage({ type: "error", text: "Please enter a valid 6-digit code from Google Authenticator." });
       return;
     }
     setIsSubmitting(true);
-    set2faMessage(null);
+    setTwoFaMessage(null);
     try {
       const token = getAccessToken();
       const endpoint = enable ? "/api/v1/client/auth/2fa/enable" : "/api/v1/client/auth/2fa/disable";
@@ -58,12 +58,12 @@ export function SettingsPage() {
       if (!res.ok) {
         throw new Error(data.detail || "Action failed.");
       }
-      set2faMessage({ type: "success", text: data.message });
+      setTwoFaMessage({ type: "success", text: data.message });
       setTotpCode("");
       fetch2FASetup();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error updating 2FA";
-      set2faMessage({ type: "error", text: msg });
+      setTwoFaMessage({ type: "error", text: msg });
     } finally {
       setIsSubmitting(false);
     }
@@ -125,10 +125,10 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                {2faMessage && (
-                  <div className={`flex items-center gap-2 rounded-lg p-3 text-xs ${2faMessage.type === "success" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"}`}>
-                    {2faMessage.type === "success" ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
-                    <span>{2faMessage.text}</span>
+                {twoFaMessage && (
+                  <div className={`flex items-center gap-2 rounded-lg p-3 text-xs ${twoFaMessage.type === "success" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"}`}>
+                    {twoFaMessage.type === "success" ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
+                    <span>{twoFaMessage.text}</span>
                   </div>
                 )}
 

@@ -13,6 +13,8 @@ interface ClientSessionPayload {
   account_status: string;
   access_token: string;
   refresh_token: string;
+  requires_2fa?: boolean;
+  temp_2fa_token?: string;
 }
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");

@@ -6,6 +6,13 @@ from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.middleware.rate_limit import get_limiter
 from app.models.domain import AccountStatus, User, UserRole
+from app.services.auth_tokens import (
+    create_email_verification_token,
+    use_email_verification_token,
+    create_password_reset_token,
+    use_password_reset_token,
+)
+from app.services.refresh_sessions import invalidate_all_user_sessions
 from app.schemas.auth import (
     AccountStatusResponse,
     UserInfo,
@@ -151,3 +158,58 @@ def get_account_status(email: str, db: DbSession) -> AccountStatusResponse:
         account_status=user.account_status.value,
         message=status_messages.get(user.account_status, "Unknown status")
     )
+
+
+@router.get("/verify-email")
+def verify_email(token: str, db: DbSession):
+    """Verify a user's email using a one-time token.
+
+    In development environment the verification URL/token is returned by the registration flow
+    for convenience. In production, tokens should be sent via email and not returned in responses.
+    """
+    user = use_email_verification_token(db, token)
+    return {"message": "Email verified successfully.", "email": user.email}
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/hour")
+def forgot_password(email: str, db: DbSession):
+    """Initiate password reset flow. Creates a one-time token and (in development) returns the reset URL.
+
+    Production deployments should send the reset URL to the user's email address instead of returning it.
+    """
+    settings = get_settings()
+    email_normalized = email.strip().lower()
+    user = db.scalar(select(User).where(User.email == email_normalized))
+    # Do not reveal whether the email exists
+    if user is None:
+        return {"message": "If an account exists for this email, a password reset link has been sent."}
+
+    token_obj, raw = create_password_reset_token(db, user)
+    reset_url = f"{settings.frontend_url}/reset-password?token={raw}" if settings.environment != "production" else None
+
+    # NOTE: Integrate real email sending here in production.
+    response = {"message": "If an account exists for this email, a password reset link has been sent."}
+    if reset_url:
+        response["reset_url"] = reset_url
+    return response
+
+
+@router.post("/reset-password")
+@limiter.limit("5/hour")
+def reset_password(token: str, new_password: str, db: DbSession):
+    """Reset a user's password using a one-time token. Invalidates all existing sessions on success."""
+    # Validate password strength via existing schema rules (reuse hash_password here)
+    token_obj = use_password_reset_token(db, token)
+    user = db.get(User, token_obj.user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token or user.")
+
+    # Update password
+    user.password_hash = hash_password(new_password)
+    db.commit()
+
+    # Invalidate existing sessions
+    invalidate_all_user_sessions(db, user.id)
+
+    return {"message": "Password has been reset successfully."}

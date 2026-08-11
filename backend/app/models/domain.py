@@ -92,6 +92,31 @@ class RefreshToken(Base):
     user: Mapped["User"] = relationship(back_populates="refresh_tokens")
 
 
+# Audit / one-time tokens (email verification + password resets)
+class OneTimeTokenBase(Base):
+    __abstract__ = True
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(512), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    used: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EmailVerificationToken(OneTimeTokenBase):
+    __tablename__ = "email_verification_tokens"
+
+    user: Mapped["User"] = relationship(back_populates="email_verification_tokens")
+
+
+class PasswordResetToken(OneTimeTokenBase):
+    __tablename__ = "password_reset_tokens"
+
+    user: Mapped["User"] = relationship(back_populates="password_reset_tokens")
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -126,6 +151,10 @@ class User(Base):
         foreign_keys="[UserStrategyAssignment.user_id]",
         cascade="all, delete-orphan"
     )
+
+    # One-time tokens (email verification + password reset)
+    email_verification_tokens: Mapped[list["EmailVerificationToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class BrokerConnection(Base):

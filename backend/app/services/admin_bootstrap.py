@@ -27,12 +27,11 @@ def ensure_initial_super_admin(session: Session) -> User | None:
     session.add(initial_admin)
     session.commit()
     session.refresh(initial_admin)
-    print(
-        "\n----------------------------------------------------\n"
-        "Initial Super Admin\n\n"
-        f"Email: {settings.admin_email}\n"
-        f"Password: {settings.admin_password}\n"
-        "----------------------------------------------------",
-        flush=True,
-    )
+
+    # Do not print secrets to stdout. Log the creation event without exposing the password.
+    from app.core.logging import get_logger
+
+    logger = get_logger("admin_bootstrap")
+    logger.info("initial_super_admin_created", email=settings.admin_email)
+
     return initial_admin

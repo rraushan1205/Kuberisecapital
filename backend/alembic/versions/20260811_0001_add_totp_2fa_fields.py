@@ -1,7 +1,7 @@
 """add_totp_2fa_fields
 
 Revision ID: 20260811_0001
-Revises: 20260807_0003_add_cancel_attempt_count
+Revises: 1f1d58996ab5
 Create Date: 2026-08-11 06:39:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '20260811_0001'
-down_revision: Union[str, None] = '20260807_0003_add_cancel_attempt_count'
+down_revision: Union[str, None] = '1f1d58996ab5'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
