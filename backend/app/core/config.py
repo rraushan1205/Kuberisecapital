@@ -25,12 +25,12 @@ class Settings(BaseSettings):
     absolute_max_session_admin_hours: int | None = None
     absolute_max_session_user_hours: int | None = None
 
+    # Environment detection
+    environment: str = "development"
+
     # Cookie security settings
     cookie_secure: bool = True
     cookie_samesite: str = "strict"
-
-    # Environment detection
-    environment: str = "production"
 
     admin_email: str = "admin@example.com"
     admin_password: str

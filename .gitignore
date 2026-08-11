@@ -99,3 +99,6 @@ scratch_*.py
 # All shell scripts
 *.sh
 backend/*.sh
+
+# clerk configuration (can include secrets)
+/.clerk/
