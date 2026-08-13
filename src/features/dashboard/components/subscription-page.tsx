@@ -99,7 +99,7 @@ export function SubscriptionPage() {
   async function handleRequestPlan(planId: string) {
     setRequestingPlanId(planId);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/client/subscription/request`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/client/subscription-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
         credentials: "include",
@@ -128,7 +128,7 @@ export function SubscriptionPage() {
 
     setCancelingRequestId(requestId);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/client/subscription/request/${requestId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/client/subscription-requests/${requestId}`, {
         method: "DELETE",
         credentials: "include",
         headers: { Accept: "application/json", ...authHeader() },

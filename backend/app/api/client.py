@@ -272,6 +272,37 @@ def get_user_subscription_requests(user: CurrentUser, db: DbSession) -> list[Sub
     return list(requests)
 
 
+@router.delete("/subscription-requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_subscription_request(
+    request_id: UUID,
+    user: CurrentUser,
+    db: DbSession,
+) -> None:
+    """Cancel a pending subscription request belonging to the authenticated user."""
+
+    request = db.scalar(
+        select(SubscriptionRequest).where(
+            SubscriptionRequest.id == request_id,
+            SubscriptionRequest.user_id == user.id,
+        )
+    )
+
+    if not request:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subscription request not found",
+        )
+
+    if request.status != SubscriptionRequestStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only pending subscription requests can be cancelled",
+        )
+
+    db.delete(request)
+    db.commit()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Enhanced User Profile
 # ─────────────────────────────────────────────────────────────────────────────
