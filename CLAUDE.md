@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Stratum is an algorithmic trading platform: a Next.js 15 (App Router) frontend backed by a Python FastAPI API. Users register, get admin-approved, and subscribe to trading plans; admins manage users, subscriptions, strategies, and announcements. There is no Docker setup — run both servers locally against PostgreSQL + Redis. Note: broker (Fyers) integration was removed — there is no broker connection system.
+Kuberise Capital is an algorithmic trading platform: a Next.js 15 (App Router) frontend backed by a Python FastAPI API. Users register, get admin-approved, and subscribe to trading plans; admins manage users, subscriptions, strategies, and announcements. There is no Docker setup — run both servers locally against PostgreSQL + Redis. Note: broker (Fyers) integration was removed — there is no broker connection system.
 
 ## Commands
 

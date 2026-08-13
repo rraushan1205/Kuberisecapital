@@ -1,5 +1,5 @@
 """
-Broker-specific exceptions for the Stratum platform.
+Broker-specific exceptions for the Kuberise Capital platform.
 
 This module defines a hierarchy of exceptions that broker implementations
 can raise to communicate specific error conditions. These exceptions follow

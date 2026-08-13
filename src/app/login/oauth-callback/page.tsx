@@ -25,7 +25,7 @@ function OAuthCallbackContent() {
       let errorMessage = "Unable to authenticate with Fyers.";
       
       if (errorParam === "no_account") {
-        errorMessage = "No Stratum account found. Please register with email first, then connect your broker.";
+        errorMessage = "No Kuberise Capital account found. Please register with email first, then connect your broker.";
       } else if (errorParam === "broker_auth_failed") {
         errorMessage = "Fyers authentication failed. Please try again.";
       } else if (errorParam === "invalid_state") {

@@ -90,7 +90,7 @@ scratch_*.py
 /IMPLEMENTATION_SUMMARY.md
 /PROJECT_CONTEXT.md
 /QUICKSTART_FOR_CONTRIBUTOR*.md
-/stratum-clean.zip
+/kuberise-capital-clean.zip
 
 # All markdown files except README.md
 *.md

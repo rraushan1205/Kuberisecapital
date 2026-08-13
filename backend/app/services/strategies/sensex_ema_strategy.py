@@ -1,7 +1,7 @@
 """
 SENSEX EMA Crossover Strategy
 Dual-confirmation strategy using 15min index signal + 5min option entry confirmation.
-Extracted from gg_bot_sensex.py and adapted for Stratum multi-user architecture.
+Extracted from gg_bot_sensex.py and adapted for Kuberise Capital multi-user architecture.
 """
 import pandas as pd
 import numpy as np

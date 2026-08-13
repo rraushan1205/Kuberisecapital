@@ -41,7 +41,7 @@ class BrokerProvider(ABC):
     
     This class defines the interface that all broker implementations must follow.
     Each method represents a core capability that brokers must provide to support
-    the Stratum platform's trading features.
+    the Kuberise Capital platform's trading features.
     
     Implementations must handle:
         - Authentication and token management
@@ -117,7 +117,7 @@ class BrokerProvider(ABC):
             - Required scopes
         
         Args:
-            user_id: UUID of the Stratum user connecting their broker
+            user_id: UUID of the Kuberise Capital user connecting their broker
             redirect_uri: Callback URL where broker will redirect after auth
         
         Returns:
@@ -130,7 +130,7 @@ class BrokerProvider(ABC):
         Example:
             url = await broker.get_auth_url(
                 user_id=UUID("..."),
-                redirect_uri="https://stratum.com/api/v1/client/brokers/zerodha/callback"
+                redirect_uri="https://api.kuberisecapital.in/api/v1/client/brokers/zerodha/callback"
             )
             # Returns: "https://kite.zerodha.com/connect/login?api_key=...&state=..."
         """
@@ -193,7 +193,7 @@ class BrokerProvider(ABC):
         access token without requiring user interaction.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             refresh_token: Current refresh token (decrypted)
         
         Returns:
@@ -224,7 +224,7 @@ class BrokerProvider(ABC):
         revoking access for security reasons.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Access token to revoke (decrypted)
         
         Raises:
@@ -248,7 +248,7 @@ class BrokerProvider(ABC):
         Fetch user profile information from broker.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
         
         Returns:
@@ -267,7 +267,7 @@ class BrokerProvider(ABC):
         Fetch available funds and margin information.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
         
         Returns:
@@ -290,7 +290,7 @@ class BrokerProvider(ABC):
         Fetch long-term holdings (delivery positions).
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
         
         Returns:
@@ -309,7 +309,7 @@ class BrokerProvider(ABC):
         Fetch open trading positions (intraday and overnight).
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
         
         Returns:
@@ -340,7 +340,7 @@ class BrokerProvider(ABC):
             4. Convert response to standard Order format
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
             order: Order details (see types.OrderRequest)
         
@@ -366,7 +366,7 @@ class BrokerProvider(ABC):
         Modify an existing pending order.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
             order_id: Broker's order ID
             modifications: Fields to modify (quantity, price, trigger_price, etc.)
@@ -389,7 +389,7 @@ class BrokerProvider(ABC):
         Cancel a pending order.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
             order_id: Broker's order ID
         
@@ -410,7 +410,7 @@ class BrokerProvider(ABC):
         Fetch all orders for the current trading day.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
         
         Returns:
@@ -430,7 +430,7 @@ class BrokerProvider(ABC):
         Fetch details of a specific order.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
             order_id: Broker's order ID
         
@@ -455,7 +455,7 @@ class BrokerProvider(ABC):
         Fetch real-time quotes for given symbols.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
             symbols: List of trading symbols (e.g., ["NSE:INFY", "NSE:TCS"])
         
@@ -487,7 +487,7 @@ class BrokerProvider(ABC):
         Fetch historical OHLCV candle data.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
             symbol: Trading symbol (e.g., "NSE:INFY")
             interval: Candle interval (see types.Interval)
@@ -523,7 +523,7 @@ class BrokerProvider(ABC):
         "WebSocket streaming not supported".
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
             symbols: List of symbols to subscribe to
         
@@ -544,7 +544,7 @@ class BrokerProvider(ABC):
         This method is optional and pairs with subscribe_to_ticks.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid access token (decrypted)
             symbols: List of symbols to unsubscribe from
         

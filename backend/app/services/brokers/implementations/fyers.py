@@ -87,7 +87,7 @@ class FyersBroker(BrokerProvider):
         "STOP_LOSS_MARKET": 4 # Stop Loss Market order
     }
     
-    # Fyers product type mapping (Stratum normalized → Fyers-specific)
+    # Fyers product type mapping (Kuberise Capital normalized → Fyers-specific)
     PRODUCT_TYPE_MAP = {
         "INTRADAY": "INTRADAY",  # Intraday/MIS
         "DELIVERY": "CNC",       # Cash & Carry (Fyers uses CNC, not DELIVERY)
@@ -108,7 +108,7 @@ class FyersBroker(BrokerProvider):
         Fyers redirects back to redirect_uri with an auth code.
         
         Args:
-            user_id: UUID of the Stratum user initiating connection
+            user_id: UUID of the Kuberise Capital user initiating connection
             redirect_uri: URL where Fyers will redirect after authorization
         
         Returns:
@@ -324,7 +324,7 @@ class FyersBroker(BrokerProvider):
         users must re-authenticate through the OAuth flow.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             refresh_token: Not used (Fyers doesn't support refresh tokens)
         
         Raises:
@@ -345,7 +345,7 @@ class FyersBroker(BrokerProvider):
         making an API call, allowing the database connection to be marked as disconnected.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Access token to revoke (ignored as Fyers has no revocation endpoint)
         
         Note:
@@ -369,7 +369,7 @@ class FyersBroker(BrokerProvider):
         enabled products, and accessible exchanges.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token (decrypted, in format "APP_ID:USER_ID:TOKEN")
         
         Returns:
@@ -485,7 +485,7 @@ class FyersBroker(BrokerProvider):
         and collateral values.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token (decrypted, in format "APP_ID:USER_ID:TOKEN")
         
         Returns:
@@ -601,7 +601,7 @@ class FyersBroker(BrokerProvider):
         Retrieves all delivery holdings with current valuation and P&L.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token (decrypted, in format "APP_ID:USER_ID:TOKEN")
         
         Returns:
@@ -709,7 +709,7 @@ class FyersBroker(BrokerProvider):
         Retrieves all active positions with current P&L and market value.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token (decrypted, in format "APP_ID:USER_ID:TOKEN")
         
         Returns:
@@ -834,7 +834,7 @@ class FyersBroker(BrokerProvider):
         Retrieves order history including pending, executed, and cancelled orders.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token (decrypted, in format "APP_ID:USER_ID:TOKEN")
         
         Returns:
@@ -945,7 +945,7 @@ class FyersBroker(BrokerProvider):
         Fetch details of a specific order from Fyers.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token (decrypted, in format "APP_ID:USER_ID:TOKEN")
             order_id: Fyers order ID
         
@@ -991,7 +991,7 @@ class FyersBroker(BrokerProvider):
         the order attempt for audit purposes.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token
             order: Order request with all required fields
         
@@ -1207,7 +1207,7 @@ class FyersBroker(BrokerProvider):
         then applies the requested modifications.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token
             order_id: Broker order ID to modify
             modifications: Dict of fields to modify (quantity, price, trigger_price, etc.)
@@ -1378,7 +1378,7 @@ class FyersBroker(BrokerProvider):
         Fetches the current order state first to validate it can be cancelled.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token
             order_id: Broker order ID to cancel
         
@@ -1482,7 +1482,7 @@ class FyersBroker(BrokerProvider):
         Fetch real-time quotes for given symbols from Fyers.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token (decrypted, in format "APP_ID:USER_ID:TOKEN")
             symbols: List of trading symbols in Fyers format (e.g., ["NSE:SBIN-EQ", "NSE:TCS-EQ"])
         
@@ -1617,7 +1617,7 @@ class FyersBroker(BrokerProvider):
         Fetch historical OHLCV candle data from Fyers.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Fyers access token (decrypted, in format "APP_ID:USER_ID:TOKEN")
             symbol: Trading symbol in Fyers format (e.g., "NSE:SBIN-EQ")
             interval: Candle interval (e.g., "1", "5", "15", "60", "D" for daily)

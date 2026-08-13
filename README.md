@@ -1,4 +1,4 @@
-# Stratum Trading Platform
+# Kuberise Capital Trading Platform
 
 > Algorithmic trading platform with admin panel and user dashboard
 
@@ -8,8 +8,8 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/rraushan1205/stratum.git
-cd stratum
+git clone https://github.com/rraushan1205/Kuberisecapital.git
+cd Kuberisecapital
 
 # 2. Run automated setup (installs everything)
 chmod +x setup-dev.sh
@@ -69,7 +69,7 @@ EOF
 **Backend (backend/.env):**
 ```bash
 cat > backend/.env << 'EOF'
-DATABASE_URL=postgresql+psycopg://stratum:stratum@localhost:5432/stratum
+DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/kuberisecapital
 REDIS_URL=redis://localhost:6379/0
 JWT_SECRET_KEY=PASTE_YOUR_SECRET_HERE
 JWT_ALGORITHM=HS256
@@ -264,7 +264,7 @@ Get dashboard data for authenticated user (requires valid JWT token).
 
 **Headers:**
 ```
-Cookie: stratum_token=<jwt_token>
+Cookie: kuberise_token=<jwt_token>
 ```
 
 **Response (200):**

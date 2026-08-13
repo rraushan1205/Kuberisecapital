@@ -7,7 +7,7 @@ as the primary interface for route handlers to interact with brokers.
 
 Design rationale:
     - Factory pattern: Centralizes broker instantiation logic
-    - Follows existing Stratum pattern (similar to trading_engine.py service)
+    - Follows existing Kuberise Capital pattern (similar to trading_engine.py service)
     - Stateless: Creates fresh broker instances on demand
     - Thread-safe: No shared mutable state
     - Easy to test: Can inject mock registries
@@ -34,7 +34,7 @@ class BrokerManager:
         - Validating broker provider names
         - Providing a consistent interface for broker access
     
-    This class follows the existing Stratum service pattern:
+    This class follows the existing Kuberise Capital service pattern:
         - Stateless (no instance variables storing state)
         - Simple function-based interface
         - Direct instantiation (no complex DI framework)
@@ -255,7 +255,7 @@ def get_broker_manager() -> BrokerManager:
             # ... use broker
     
     Note:
-        This follows the existing Stratum pattern from:
+        This follows the existing Kuberise Capital pattern from:
             - app.core.config.get_settings()
             - app.db.session.get_db()
     """

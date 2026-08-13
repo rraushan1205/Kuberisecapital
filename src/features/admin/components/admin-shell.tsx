@@ -25,7 +25,7 @@ const navigation = [
 ];
 
 function AdminIdentity() {
-  return <Link href="/admin/dashboard" className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]"><span className="grid h-7 w-7 place-items-center rounded-[7px] bg-[var(--danger)] text-[11px] font-bold text-white">S</span><span><span className="block text-[14px] font-semibold tracking-[-0.03em] text-[var(--ink)]">Stratum</span><span className="block font-mono text-[8px] font-medium tracking-[0.13em] text-[var(--danger)]">ADMIN PORTAL</span></span></Link>;
+  return <Link href="/admin/dashboard" className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)]"><span className="grid h-7 w-7 place-items-center rounded-[7px] bg-[var(--danger)] text-[11px] font-bold text-white">S</span><span><span className="block text-[14px] font-semibold tracking-[-0.03em] text-[var(--ink)]">Kuberise Capital</span><span className="block font-mono text-[8px] font-medium tracking-[0.13em] text-[var(--danger)]">ADMIN PORTAL</span></span></Link>;
 }
 
 function AdminNavigation({ onNavigate }: { onNavigate?: () => void }) {

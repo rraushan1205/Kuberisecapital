@@ -1,5 +1,5 @@
 """
-Broker integration module for Stratum platform.
+Broker integration module for Kuberise Capital platform.
 
 This module provides the foundation for integrating multiple broker providers
 into the platform. It follows the strategy pattern to allow seamless addition

@@ -109,7 +109,7 @@ class AliceBlueBroker(BrokerProvider):
         Alice Blue redirects back with authCode and userId query params.
         
         Args:
-            user_id: UUID of the Stratum user initiating connection
+            user_id: UUID of the Kuberise Capital user initiating connection
             redirect_uri: URL where Alice Blue will redirect after authorization
         
         Returns:
@@ -351,7 +351,7 @@ class AliceBlueBroker(BrokerProvider):
         users must re-authenticate through the OAuth flow.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             refresh_token: Not used (Alice Blue doesn't support refresh tokens)
         
         Raises:
@@ -372,7 +372,7 @@ class AliceBlueBroker(BrokerProvider):
         an API call, allowing the database connection to be marked as disconnected.
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Access token to revoke (ignored as Alice Blue has no revocation endpoint)
         
         Note:
@@ -398,7 +398,7 @@ class AliceBlueBroker(BrokerProvider):
             3. Response shape
         
         Args:
-            user_id: UUID of the Stratum user
+            user_id: UUID of the Kuberise Capital user
             access_token: Valid Alice Blue access token (userSession)
         
         Returns:

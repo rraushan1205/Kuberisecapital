@@ -14,13 +14,13 @@
 export type SessionKind = "user" | "admin";
 
 const ACCESS_KEY: Record<SessionKind, string> = {
-  user: "stratum_access",
-  admin: "stratum_admin_access",
+  user: "kuberise_access",
+  admin: "kuberise_admin_access",
 };
 
 const REFRESH_KEY: Record<SessionKind, string> = {
-  user: "stratum_refresh",
-  admin: "stratum_admin_refresh",
+  user: "kuberise_refresh",
+  admin: "kuberise_admin_refresh",
 };
 
 export function getAccessToken(kind: SessionKind = "user"): string | null {

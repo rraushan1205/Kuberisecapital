@@ -73,7 +73,7 @@ export function AuthShell({ children, mode = "access" }: AuthShellProps) {
           {children}
         </motion.div>
         <footer className="flex min-h-6 items-center justify-between gap-4 font-mono text-[10px] tracking-[0.04em] text-[var(--ink-subtle)]">
-          <span>© {new Date().getFullYear()} STRATUM SYSTEMS</span>
+          <span>© {new Date().getFullYear()} KUBERISE CAPITAL SYSTEMS</span>
           {!isRegister && <Link href="/register" className="group inline-flex items-center gap-1.5 rounded-sm outline-none transition hover:text-[var(--ink-muted)] focus-visible:ring-2 focus-visible:ring-[var(--focus)]">REQUEST ACCESS <ArrowUpRight size={12} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></Link>}
         </footer>
       </section>

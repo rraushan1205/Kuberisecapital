@@ -263,7 +263,7 @@ async def oauth_login_callback(
         existing_connection.refresh_token_encrypted = refresh_token_encrypted
         existing_connection.token_expires_at = token_expires_at
 
-        # Create refresh session for Stratum authentication
+        # Create refresh session for Kuberise Capital authentication
         refresh_session, raw_refresh_token = create_refresh_session(db, user)
         
         db.commit()
